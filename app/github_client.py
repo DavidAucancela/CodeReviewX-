@@ -4,7 +4,7 @@ import logging
 import time
 import jwt
 import httpx
-from config.settings import GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_PATH
+from config.settings import GITHUB_APP_ID, get_private_key
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +13,7 @@ GITHUB_API = "https://api.github.com"
 
 def _generate_jwt() -> str:
     """Genera un JWT firmado con la private key de la GitHub App."""
-    with open(GITHUB_APP_PRIVATE_KEY_PATH, "r") as f:
-        private_key = f.read()
-
+    private_key = get_private_key()
     now = int(time.time())
     payload = {
         "iat": now - 60,
