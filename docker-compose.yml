@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./private-key.pem:/app/private-key.pem:ro
+    restart: unless-stopped
