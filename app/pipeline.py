@@ -36,7 +36,22 @@ def run_review_pipeline(
     pr_number: int,
     installation_id: int,
 ) -> None:
-    """Pipeline completo: obtiene diff → analiza → publica comentarios."""
+    """Pipeline completo: obtiene diff → analiza → publica comentarios.
+
+    Corre en un hilo de fondo, así que cualquier excepción se loguea aquí:
+    de lo contrario desaparecería sin rastro (el webhook ya respondió 200).
+    """
+    try:
+        _run_review_pipeline(repo, pr_number, installation_id)
+    except Exception:
+        logger.exception(f"Pipeline falló para {repo}#{pr_number}")
+
+
+def _run_review_pipeline(
+    repo: str,
+    pr_number: int,
+    installation_id: int,
+) -> None:
     logger.info(f"Iniciando review: {repo}#{pr_number}")
 
     token = get_installation_token(installation_id)
