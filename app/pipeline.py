@@ -60,6 +60,16 @@ def _run_review_pipeline(
 
     if not file_contexts:
         logger.info("No hay archivos soportados en el PR — nada que revisar")
+        post_review(
+            repo=repo,
+            pr_number=pr_number,
+            token=token,
+            body=(
+                "🤖 **Code Review IA** — No encontré archivos de código soportados "
+                "(`.py`, `.js`, `.ts`, `.jsx`, `.tsx`) en este PR, así que no hay nada que revisar."
+            ),
+            comments=[],
+        )
         return
 
     all_inline_comments = []
