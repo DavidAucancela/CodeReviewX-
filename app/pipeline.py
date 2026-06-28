@@ -5,15 +5,24 @@ from app.github_client import get_installation_token, get_pr_files, post_review
 from app.diff_parser import extract_file_contexts
 from app.static_analyzer import run_static_analysis
 from app.semantic_analyzer import analyze_semantically
+from config.settings import MAX_INLINE_COMMENTS
 
 logger = logging.getLogger(__name__)
+
+_SEVERITY_RANK = {"🔴": 0, "🟡": 1, "🔵": 2}
+
+
+def _severity(body: str) -> int:
+    for emoji, rank in _SEVERITY_RANK.items():
+        if emoji in body:
+            return rank
+    return 3
 
 
 def _build_inline_comments(file_ctx: dict, semantic_comments: list[dict]) -> list[dict]:
     """
-    Convierte comentarios {line, comment} en el formato que espera la GitHub API:
-    {path, line, body, side}
-    Solo incluye comentarios cuya línea esté en el diff.
+    Convierte comentarios {line, comment} en el formato que espera la GitHub API.
+    Solo incluye comentarios cuya línea esté en el diff (line_map).
     """
     line_map = file_ctx["line_map"]
     inline = []
@@ -26,9 +35,48 @@ def _build_inline_comments(file_ctx: dict, semantic_comments: list[dict]) -> lis
                 "line": line,
                 "side": "RIGHT",
                 "body": f"🤖 **Code Review IA**\n\n{c['comment']}",
+                "_severity": _severity(c["comment"]),
             })
 
     return inline
+
+
+def _build_summary(
+    file_results: list[tuple[dict, list[dict]]],
+    total_inline: int,
+    posted_inline: int,
+) -> str:
+    total_findings = sum(len(comments) for _, comments in file_results)
+
+    if total_findings == 0:
+        return "✅ Revisión completada. No se encontraron problemas significativos."
+
+    header_parts = [
+        "🔍 **Revisión automática completada**\n\n",
+        f"Se analizaron **{len(file_results)}** archivo(s) con cambios. "
+        f"Claude detectó **{total_findings}** observación(es).",
+    ]
+
+    if total_inline > posted_inline:
+        header_parts.append(
+            f" Se muestran las **{posted_inline}** más críticas como comentarios inline; "
+            f"las restantes **{total_inline - posted_inline}** aparecen solo en este resumen."
+        )
+
+    header_parts.append("\n\n---\n\n### Hallazgos por archivo\n")
+
+    file_sections = []
+    for ctx, comments in file_results:
+        if not comments:
+            continue
+        filename = ctx["filename"]
+        lines = [f"\n**`{filename}`** — {len(comments)} observación(es)\n"]
+        for c in comments:
+            first_line = c["comment"].split("\n")[0]
+            lines.append(f"- Línea {c.get('line', '?')}: {first_line}\n")
+        file_sections.append("".join(lines))
+
+    return "".join(header_parts) + "".join(file_sections)
 
 
 def run_review_pipeline(
@@ -62,12 +110,13 @@ def _run_review_pipeline(
         logger.info("No hay archivos soportados en el PR — nada que revisar")
         return
 
-    all_inline_comments = []
+    # Acumula (ctx, semantic_comments) y todos los candidatos a inline
+    file_results: list[tuple[dict, list[dict]]] = []
+    all_inline: list[dict] = []
 
     for ctx in file_contexts:
         logger.info(f"Analizando {ctx['filename']} ({ctx['language']})")
 
-        # Extraer el código nuevo del patch para análisis estático
         new_code_lines = [
             line[1:] for line in ctx["patch"].splitlines() if line.startswith("+")
         ]
@@ -85,23 +134,29 @@ def _run_review_pipeline(
         logger.info(f"  → {len(semantic_comments)} comentarios semánticos")
 
         inline = _build_inline_comments(ctx, semantic_comments)
-        all_inline_comments.extend(inline)
+        all_inline.extend(inline)
+        file_results.append((ctx, semantic_comments))
 
-    if not all_inline_comments:
-        summary = "✅ Revisión completada. No se encontraron problemas significativos."
-    else:
-        summary = (
-            f"🔍 **Revisión automática completada**\n\n"
-            f"Se encontraron **{len(all_inline_comments)}** observaciones "
-            f"en {len(file_contexts)} archivo(s)."
-        )
+    # Ordena por severidad y aplica el cap global
+    all_inline.sort(key=lambda c: c["_severity"])
+    posted_inline = all_inline[:MAX_INLINE_COMMENTS]
+    # Elimina el campo interno antes de enviar a GitHub
+    for c in posted_inline:
+        c.pop("_severity", None)
+
+    logger.info(
+        f"Comentarios inline: {len(all_inline)} generados → {len(posted_inline)} publicados "
+        f"(cap={MAX_INLINE_COMMENTS})"
+    )
+
+    summary = _build_summary(file_results, len(all_inline), len(posted_inline))
 
     post_review(
         repo=repo,
         pr_number=pr_number,
         token=token,
         body=summary,
-        comments=all_inline_comments,
+        comments=posted_inline,
     )
 
-    logger.info(f"Review completado: {len(all_inline_comments)} comentarios publicados")
+    logger.info(f"Review completado: {len(posted_inline)} inline + resumen publicado")

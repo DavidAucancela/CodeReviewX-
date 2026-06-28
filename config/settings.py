@@ -17,6 +17,11 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
 # archivo enorme dispare el costo (~4 chars/token → 12000 chars ≈ 3000 tokens).
 MAX_PATCH_CHARS = int(os.getenv("MAX_PATCH_CHARS", 12000))
 
+# Máximo de comentarios inline publicados en el PR. Los hallazgos que superan
+# este límite se incluyen igualmente en el resumen del review (body), priorizando
+# siempre los de mayor severidad (🔴 > 🟡 > 🔵).
+MAX_INLINE_COMMENTS = int(os.getenv("MAX_INLINE_COMMENTS", 15))
+
 # LLM Observatory — métricas de uso de Claude
 OBSERVATORY_URL = os.getenv("OBSERVATORY_URL", "https://llm-web-production.up.railway.app")
 OBSERVATORY_TOKEN = os.getenv("OBSERVATORY_TOKEN")  # obs_sk_...; si falta, no se envían métricas
