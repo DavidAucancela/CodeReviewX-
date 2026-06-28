@@ -92,7 +92,18 @@ GITHUB_APP_PRIVATE_KEY_PATH=private-key.pem
 GITHUB_WEBHOOK_SECRET=tu_secret_aqui
 ANTHROPIC_API_KEY=sk-ant-...
 PORT=8000
+
+# Opcional — control de costo
+ANTHROPIC_MODEL=claude-haiku-4-5    # más barato; claude-sonnet-4-6 para máxima detección
+MAX_PATCH_CHARS=12000               # tope de caracteres del diff por archivo
+
+# Opcional — métricas de uso/costo (llm-observatory). Requiere Python >= 3.10 si se setea.
+# Si OBSERVATORY_TOKEN está vacío, el bot funciona igual pero NO envía métricas.
+OBSERVATORY_TOKEN=                   # obs_sk_...
+OBSERVATORY_URL=https://llm-web-production.up.railway.app
 ```
+
+> **Costo en Observatory:** el SDK calcula el costo por ID de modelo exacto y solo conoce el ID con fecha `claude-haiku-4-5-20251001` (no el alias `claude-haiku-4-5`). Si usás métricas con Haiku, poné `ANTHROPIC_MODEL=claude-haiku-4-5-20251001`, si no el costo se registra como $0 (los tokens sí se cuentan). `claude-sonnet-4-6` no necesita fecha.
 
 ### 4. Instalar la App en un repositorio
 
@@ -162,10 +173,29 @@ El proyecto incluye `Dockerfile` y `docker-compose.yml` listos para producción.
 1. Subir el código a un repo de GitHub
 2. Crear un nuevo proyecto en [railway.app](https://railway.app) y conectar ese repo
 3. En Railway, configurar las variables de entorno (las mismas del `.env`)
-4. Para la private key: copiar el contenido del `.pem` como variable `GITHUB_APP_PRIVATE_KEY` y ajustar `github_client.py` para leerla desde esa variable en lugar del archivo
-5. Railway asigna una URL pública automáticamente — usarla como Webhook URL en la GitHub App
+4. Para la private key: Railway no aloja archivos `.pem`, así que se pasa el contenido como variable `GITHUB_APP_PRIVATE_KEY` en una sola línea con los saltos escapados (`\n`). Generarla con:
+   ```bash
+   awk 'NF {printf "%s\\n", $0}' private-key.pem
+   ```
+   `config/settings.py:get_private_key()` prioriza `GITHUB_APP_PRIVATE_KEY` y, si no existe, cae al archivo `GITHUB_APP_PRIVATE_KEY_PATH` (uso local).
+5. (Opcional) Métricas: setear `OBSERVATORY_TOKEN` (`obs_sk_...`). El `.env` local **no** viaja al deploy; hay que ponerlo en las variables de Railway. Para Haiku usar `ANTHROPIC_MODEL=claude-haiku-4-5-20251001` (ver nota de costo arriba).
+6. Railway asigna una URL pública automáticamente — usarla como Webhook URL en la GitHub App
 
 > En producción no se usa ngrok. La URL de Railway es permanente.
+
+---
+
+## Rotar la private key
+
+Si la private key se filtra o caduca, se rota sin downtime (la key vieja sigue válida hasta que se revoca). El orden importa: **validar la nueva antes de borrar la vieja.**
+
+1. **Generar la nueva** en https://github.com/settings/apps/&lt;tu-app&gt; → *Private keys* → *Generate a private key* (descarga un `.pem` nuevo). **No borres la vieja todavía.**
+2. **Reemplazar local:** copiar el nuevo `.pem` sobre `private-key.pem`.
+3. **Actualizar Railway:** regenerar la single-line (`awk 'NF {printf "%s\\n", $0}' private-key.pem`) y setear `GITHUB_APP_PRIVATE_KEY`. Esto dispara un redeploy.
+4. **Validar:** con la nueva key, generar un JWT de la App y llamar `GET https://api.github.com/app` → debe devolver `200`. Confirmar que prod redeployó sano (`/health` → `200`) y, si querés certeza total, abrir un PR de prueba y ver que el bot comenta (mintea el installation token con la key nueva).
+5. **Revocar la vieja:** recién ahora, en GitHub → *Private keys* → borrar la key anterior. Verificá que un JWT firmado con la vieja devuelve `401`.
+
+> Si alguna vez la key (o cualquier secreto) se pega en un chat/log, considerala comprometida y rotala.
 
 ---
 

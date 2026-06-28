@@ -85,6 +85,8 @@ OBSERVATORY_TOKEN=obs_sk_...       # leave empty to disable metrics
 OBSERVATORY_URL=https://llm-web-production.up.railway.app
 ```
 
+> When sending metrics with Haiku, set `ANTHROPIC_MODEL=claude-haiku-4-5-20251001` (the dated id) so llm-observatory records real cost — the bare alias `claude-haiku-4-5` isn't in its pricing table and logs cost as `$0` (tokens are still counted). `claude-sonnet-4-6` needs no date.
+
 > For local development, you can use `GITHUB_APP_PRIVATE_KEY_PATH=private-key.pem` and place the `.pem` file in the project root instead.
 
 ### 3. Local development
