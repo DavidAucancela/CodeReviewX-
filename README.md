@@ -35,7 +35,7 @@ run_review_pipeline (background task)
       │
       └── for each file:
             ├── run_static_analysis (ruff / eslint)
-            ├── analyze_semantically (Claude Sonnet)
+            ├── analyze_semantically (Claude, configurable model)
             └── post_review (inline comments on PR)
 ```
 
@@ -45,7 +45,7 @@ run_review_pipeline (background task)
 |---|---|
 | Web framework | FastAPI + Uvicorn |
 | GitHub integration | PyGithub + custom JWT auth |
-| AI analysis | Anthropic Claude Sonnet (`claude-sonnet-4-6`) |
+| AI analysis | Anthropic Claude (configurable, defaults to `claude-haiku-4-5`) |
 | Static analysis (Python) | Ruff |
 | Static analysis (JS/TS) | ESLint |
 | HTTP client | httpx |
@@ -74,6 +74,10 @@ GITHUB_APP_ID=your_app_id
 GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
 ANTHROPIC_API_KEY=your_anthropic_key
+
+# Optional cost knobs
+ANTHROPIC_MODEL=claude-haiku-4-5   # cheaper default; use claude-sonnet-4-6 for max bug-finding
+MAX_PATCH_CHARS=12000              # per-file diff truncation limit
 ```
 
 > For local development, you can use `GITHUB_APP_PRIVATE_KEY_PATH=private-key.pem` and place the `.pem` file in the project root instead.
