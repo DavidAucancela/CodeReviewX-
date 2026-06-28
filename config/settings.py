@@ -17,6 +17,10 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
 # archivo enorme dispare el costo (~4 chars/token → 12000 chars ≈ 3000 tokens).
 MAX_PATCH_CHARS = int(os.getenv("MAX_PATCH_CHARS", 12000))
 
+# LLM Observatory — métricas de uso de Claude
+OBSERVATORY_URL = os.getenv("OBSERVATORY_URL", "https://llm-web-production.up.railway.app")
+OBSERVATORY_TOKEN = os.getenv("OBSERVATORY_TOKEN")  # obs_sk_...; si falta, no se envían métricas
+
 # Contenido de la key (Railway/prod) o ruta al archivo (desarrollo local)
 _key_content = os.getenv("GITHUB_APP_PRIVATE_KEY", "")
 _key_path = os.getenv("GITHUB_APP_PRIVATE_KEY_PATH", "private-key.pem")

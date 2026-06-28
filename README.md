@@ -48,6 +48,7 @@ run_review_pipeline (background task)
 | AI analysis | Anthropic Claude (configurable, defaults to `claude-haiku-4-5`) |
 | Static analysis (Python) | Ruff |
 | Static analysis (JS/TS) | ESLint |
+| Observability | llm-observatory (opt-in token/cost metrics) |
 | HTTP client | httpx |
 | Deploy | Railway (Docker) |
 
@@ -78,6 +79,10 @@ ANTHROPIC_API_KEY=your_anthropic_key
 # Optional cost knobs
 ANTHROPIC_MODEL=claude-haiku-4-5   # cheaper default; use claude-sonnet-4-6 for max bug-finding
 MAX_PATCH_CHARS=12000              # per-file diff truncation limit
+
+# Optional observability (llm-observatory) — requires Python >= 3.10 when set
+OBSERVATORY_TOKEN=obs_sk_...       # leave empty to disable metrics
+OBSERVATORY_URL=https://llm-web-production.up.railway.app
 ```
 
 > For local development, you can use `GITHUB_APP_PRIVATE_KEY_PATH=private-key.pem` and place the `.pem` file in the project root instead.

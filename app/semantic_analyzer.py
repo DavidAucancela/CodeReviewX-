@@ -2,12 +2,27 @@ from __future__ import annotations
 
 import json
 import logging
-import anthropic
-from config.settings import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, MAX_PATCH_CHARS
+from config.settings import (
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
+    MAX_PATCH_CHARS,
+    OBSERVATORY_URL,
+    OBSERVATORY_TOKEN,
+)
 
 logger = logging.getLogger(__name__)
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+if OBSERVATORY_TOKEN:
+    from llm_observatory import MonitoredAnthropic
+    client = MonitoredAnthropic(
+        api_key=ANTHROPIC_API_KEY,
+        observatory_url=OBSERVATORY_URL,
+        observatory_token=OBSERVATORY_TOKEN,
+        tags={"app": "codereviewx", "env": "production"},
+    )
+else:
+    import anthropic
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 SYSTEM_PROMPT = """Eres un revisor de código senior que escribe para un equipo
 con desarrolladores junior y semi-senior. Detectas problemas REALES en diffs de
