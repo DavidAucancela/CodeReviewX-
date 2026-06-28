@@ -3,11 +3,50 @@ from __future__ import annotations
 import json
 import logging
 import anthropic
-from config.settings import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, MAX_PATCH_CHARS
+from config.settings import (
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
+    MAX_PATCH_CHARS,
+    OBSERVATORY_URL,
+    OBSERVATORY_TOKEN,
+)
 
 logger = logging.getLogger(__name__)
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+def _build_client():
+    """Crea el cliente de Claude.
+
+    Con OBSERVATORY_TOKEN, envuelve el cliente con llm-observatory para enviar
+    métricas de uso/costo. Si el SDK no está instalado o falla al inicializar
+    (p. ej. Python < 3.10, URL/token inválidos), cae al cliente Anthropic normal:
+    la observabilidad nunca debe impedir que el bot revise PRs.
+    """
+    token = OBSERVATORY_TOKEN.strip() if OBSERVATORY_TOKEN else ""
+    if not token:
+        logger.info("LLM Observatory desactivado (sin OBSERVATORY_TOKEN); no se envían métricas")
+        return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    try:
+        from llm_observatory import MonitoredAnthropic
+
+        client = MonitoredAnthropic(
+            api_key=ANTHROPIC_API_KEY,
+            observatory_url=OBSERVATORY_URL,
+            observatory_token=token,
+            tags={"app": "codereviewx", "env": "production"},
+        )
+        logger.info(f"LLM Observatory activado; métricas hacia {OBSERVATORY_URL}")
+        return client
+    except Exception as e:
+        logger.error(
+            f"No se pudo inicializar LLM Observatory ({type(e).__name__}: {e}); "
+            "se usa el cliente Anthropic sin métricas"
+        )
+        return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+
+client = _build_client()
 
 SYSTEM_PROMPT = """Eres un revisor de código senior que escribe para un equipo
 con desarrolladores junior y semi-senior. Detectas problemas REALES en diffs de
