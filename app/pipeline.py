@@ -5,7 +5,13 @@ from app.github_client import get_installation_token, get_pr_files, post_review
 from app.diff_parser import extract_file_contexts
 from app.static_analyzer import run_static_analysis
 from app.semantic_analyzer import analyze_semantically
-from config.settings import MAX_INLINE_COMMENTS
+from config.settings import (
+    MAX_INLINE_COMMENTS,
+    TWO_PASS_MODE,
+    RISKY_FILES_ONLY,
+    RISKY_FILE_PATTERNS,
+    RISKY_PATCH_SIZE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +23,14 @@ def _severity(body: str) -> int:
         if emoji in body:
             return rank
     return 3
+
+
+def _is_risky_file(filename: str, new_code_lines: list[str]) -> bool:
+    """Heurística para RISKY_FILES_ONLY: nombre sensible o diff grande."""
+    if len(new_code_lines) > RISKY_PATCH_SIZE:
+        return True
+    lower_name = filename.lower()
+    return any(pattern in lower_name for pattern in RISKY_FILE_PATTERNS)
 
 
 def _build_inline_comments(file_ctx: dict, semantic_comments: list[dict]) -> list[dict]:
@@ -125,13 +139,23 @@ def _run_review_pipeline(
         static_issues = run_static_analysis(ctx["language"], new_code, ctx["filename"])
         logger.info(f"  → {len(static_issues)} issues estáticos")
 
-        semantic_comments = analyze_semantically(
-            filename=ctx["filename"],
-            language=ctx["language"],
-            patch=ctx["patch"],
-            static_issues=static_issues,
-        )
-        logger.info(f"  → {len(semantic_comments)} comentarios semánticos")
+        skip_reason = None
+        if RISKY_FILES_ONLY and not _is_risky_file(ctx["filename"], new_code_lines):
+            skip_reason = "archivo no riesgoso (RISKY_FILES_ONLY)"
+        elif TWO_PASS_MODE and not static_issues:
+            skip_reason = "sin issues estáticos (TWO_PASS_MODE)"
+
+        if skip_reason:
+            logger.info(f"  → análisis semántico omitido: {skip_reason}")
+            semantic_comments = []
+        else:
+            semantic_comments = analyze_semantically(
+                filename=ctx["filename"],
+                language=ctx["language"],
+                patch=ctx["patch"],
+                static_issues=static_issues,
+            )
+            logger.info(f"  → {len(semantic_comments)} comentarios semánticos")
 
         inline = _build_inline_comments(ctx, semantic_comments)
         all_inline.extend(inline)
