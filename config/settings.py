@@ -22,6 +22,31 @@ MAX_PATCH_CHARS = int(os.getenv("MAX_PATCH_CHARS", 12000))
 # siempre los de mayor severidad (🔴 > 🟡 > 🔵).
 MAX_INLINE_COMMENTS = int(os.getenv("MAX_INLINE_COMMENTS", 15))
 
+# --- Controles de costo (todos opcionales, desactivados por defecto) ---
+
+# Si es true, el prompt le pide a Claude que SOLO reporte bugs graves (🔴):
+# vulnerabilidades, crashes, lógica rota. Omite mejoras de estilo/performance/
+# legibilidad, que suelen ser la mayoría de los comentarios en PRs grandes.
+ONLY_CRITICAL_SEVERITY = os.getenv("ONLY_CRITICAL_SEVERITY", "false").lower() == "true"
+
+# Si es true, un archivo solo pasa por análisis semántico (Claude) cuando el
+# análisis estático (Ruff/ESLint) ya encontró algo en sus líneas nuevas. Los
+# archivos "limpios" no cuestan tokens.
+TWO_PASS_MODE = os.getenv("TWO_PASS_MODE", "false").lower() == "true"
+
+# Si es true, solo se llama a Claude en archivos "riesgosos": cuyo nombre matchea
+# RISKY_FILE_PATTERNS o cuyo patch supera RISKY_PATCH_SIZE líneas nuevas. El resto
+# se queda solo con análisis estático.
+RISKY_FILES_ONLY = os.getenv("RISKY_FILES_ONLY", "false").lower() == "true"
+RISKY_FILE_PATTERNS = [
+    p.strip().lower()
+    for p in os.getenv(
+        "RISKY_FILE_PATTERNS", "auth,payment,pago,db,database,secret,crypto,session,token"
+    ).split(",")
+    if p.strip()
+]
+RISKY_PATCH_SIZE = int(os.getenv("RISKY_PATCH_SIZE", 300))
+
 # LLM Observatory — métricas de uso de Claude
 OBSERVATORY_URL = os.getenv("OBSERVATORY_URL", "https://llm-web-production.up.railway.app")
 OBSERVATORY_TOKEN = os.getenv("OBSERVATORY_TOKEN")  # obs_sk_...; si falta, no se envían métricas

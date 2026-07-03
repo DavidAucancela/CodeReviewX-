@@ -7,6 +7,7 @@ from config.settings import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL,
     MAX_PATCH_CHARS,
+    ONLY_CRITICAL_SEVERITY,
     OBSERVATORY_URL,
     OBSERVATORY_TOKEN,
 )
@@ -94,10 +95,20 @@ Para CADA problema, escribe el campo "comment" con esta estructura exacta
 
 Donde {{severidad}} es uno de: 🔴 (alta), 🟡 (media), 🔵 (baja).
 
+{severity_filter}
+
 Responde con array JSON:
 [{{"line": <número de línea en el archivo>, "comment": "<comentario con la estructura de arriba>"}}]
 
 Solo incluye problemas concretos y accionables. Máximo 5 comentarios por archivo."""
+
+_CRITICAL_ONLY_INSTRUCTION = (
+    "IMPORTANTE: Reporta ÚNICAMENTE problemas de severidad 🔴 (alta): "
+    "vulnerabilidades de seguridad, crashes, lógica rota que causa fallos en "
+    "producción. NO reportes nada de severidad 🟡 o 🔵 (estilo, performance "
+    "menor, legibilidad, mejoras opcionales). Si no hay problemas graves, "
+    "responde []."
+)
 
 
 def analyze_semantically(
@@ -130,6 +141,7 @@ def analyze_semantically(
         language=language,
         static_issues=static_summary,
         patch=patch,
+        severity_filter=_CRITICAL_ONLY_INSTRUCTION if ONLY_CRITICAL_SEVERITY else "",
     )
 
     try:
