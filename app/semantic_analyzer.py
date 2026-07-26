@@ -3,27 +3,57 @@ from __future__ import annotations
 import json
 import logging
 import anthropic
+import openai
 from config.settings import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL,
+    LLM_PROVIDER,
     MAX_PATCH_CHARS,
     ONLY_CRITICAL_SEVERITY,
+    OPENAI_API_KEY,
+    OPENAI_MODEL,
     OBSERVATORY_URL,
     OBSERVATORY_TOKEN,
 )
 
 logger = logging.getLogger(__name__)
 
+MODEL = OPENAI_MODEL if LLM_PROVIDER == "openai" else ANTHROPIC_MODEL
+
 
 def _build_client():
-    """Crea el cliente de Claude.
+    """Crea el cliente de Claude u OpenAI según LLM_PROVIDER.
 
     Con OBSERVATORY_TOKEN, envuelve el cliente con llm-observatory para enviar
-    métricas de uso/costo. Si el SDK no está instalado o falla al inicializar
-    (p. ej. Python < 3.10, URL/token inválidos), cae al cliente Anthropic normal:
-    la observabilidad nunca debe impedir que el bot revise PRs.
+    métricas de uso/costo (soporta ambos proveedores). Si el SDK no está
+    instalado o falla al inicializar (p. ej. Python < 3.10, URL/token
+    inválidos), cae al cliente plano correspondiente: la observabilidad nunca
+    debe impedir que el bot revise PRs.
     """
     token = OBSERVATORY_TOKEN.strip() if OBSERVATORY_TOKEN else ""
+
+    if LLM_PROVIDER == "openai":
+        if not token:
+            logger.info("LLM Observatory desactivado (sin OBSERVATORY_TOKEN); no se envían métricas")
+            return openai.OpenAI(api_key=OPENAI_API_KEY)
+        try:
+            from llm_observatory import MonitoredOpenAI
+
+            client = MonitoredOpenAI(
+                api_key=OPENAI_API_KEY,
+                observatory_url=OBSERVATORY_URL,
+                observatory_token=token,
+                tags={"app": "codereviewx", "env": "production"},
+            )
+            logger.info(f"LLM Observatory activado (OpenAI); métricas hacia {OBSERVATORY_URL}")
+            return client
+        except Exception as e:
+            logger.error(
+                f"No se pudo inicializar LLM Observatory ({type(e).__name__}: {e}); "
+                "se usa el cliente OpenAI sin métricas"
+            )
+            return openai.OpenAI(api_key=OPENAI_API_KEY)
+
     if not token:
         logger.info("LLM Observatory desactivado (sin OBSERVATORY_TOKEN); no se envían métricas")
         return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -48,6 +78,7 @@ def _build_client():
 
 
 client = _build_client()
+logger.info(f"Proveedor de análisis semántico: {LLM_PROVIDER} (modelo={MODEL})")
 
 SYSTEM_PROMPT = """Eres un revisor de código senior que escribe para un equipo
 con desarrolladores junior y semi-senior. Detectas problemas REALES en diffs de
@@ -118,7 +149,7 @@ def analyze_semantically(
     static_issues: list[dict],
 ) -> list[dict]:
     """
-    Analiza el diff con Claude y retorna lista de {line, comment}.
+    Analiza el diff con el LLM configurado (LLM_PROVIDER) y retorna lista de {line, comment}.
     """
     if not patch:
         return []
@@ -145,21 +176,37 @@ def analyze_semantically(
     )
 
     try:
-        message = client.messages.create(
-            model=ANTHROPIC_MODEL,
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        if LLM_PROVIDER == "openai":
+            response = client.chat.completions.create(
+                model=MODEL,
+                max_tokens=1024,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            usage = response.usage
+            logger.info(
+                f"  Tokens [{MODEL}] entrada={usage.prompt_tokens} "
+                f"salida={usage.completion_tokens}"
+            )
+            raw = response.choices[0].message.content.strip()
+        else:
+            message = client.messages.create(
+                model=MODEL,
+                max_tokens=1024,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt}],
+            )
 
-        # Loguea consumo de tokens para medir el costo real por archivo.
-        usage = message.usage
-        logger.info(
-            f"  Tokens [{ANTHROPIC_MODEL}] entrada={usage.input_tokens} "
-            f"salida={usage.output_tokens}"
-        )
+            # Loguea consumo de tokens para medir el costo real por archivo.
+            usage = message.usage
+            logger.info(
+                f"  Tokens [{MODEL}] entrada={usage.input_tokens} "
+                f"salida={usage.output_tokens}"
+            )
 
-        raw = message.content[0].text.strip()
+            raw = message.content[0].text.strip()
 
         # Limpia posibles bloques de código markdown
         if raw.startswith("```"):
@@ -171,7 +218,7 @@ def analyze_semantically(
         return [c for c in comments if isinstance(c, dict) and "line" in c and "comment" in c]
 
     except json.JSONDecodeError as e:
-        logger.error(f"Claude no retornó JSON válido: {e}")
+        logger.error(f"El modelo no retornó JSON válido: {e}")
         return []
     except Exception as e:
         logger.error(f"Error en análisis semántico: {e}")
