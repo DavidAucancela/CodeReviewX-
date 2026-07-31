@@ -2,19 +2,28 @@ import logging
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Header
-from app.webhook_handler import verify_signature, parse_pr_event
-from app.pipeline import run_review_pipeline
 
+# Configura logging ANTES de importar los módulos de la app: semantic_analyzer
+# loguea el proveedor al importarse, y sin esto el root logger está en WARNING
+# y ese INFO se pierde (por eso "Proveedor de análisis semántico" nunca salía).
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
 )
+
+from app.webhook_handler import verify_signature, parse_pr_event  # noqa: E402
+from app.pipeline import run_review_pipeline  # noqa: E402
+from app.semantic_analyzer import MODEL  # noqa: E402
+from config.settings import LLM_PROVIDER  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Code Review Bot iniciado")
+    logger.info(
+        f"Code Review Bot iniciado — proveedor={LLM_PROVIDER} modelo={MODEL}"
+    )
     yield
     logger.info("Code Review Bot detenido")
 
@@ -24,7 +33,9 @@ app = FastAPI(title="Code Review Bot", lifespan=lifespan)
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    # Expone el proveedor/modelo activo para poder verificar la configuración
+    # sin abrir un PR de prueba. No incluye ninguna credencial.
+    return {"status": "ok", "provider": LLM_PROVIDER, "model": MODEL}
 
 
 @app.post("/webhook")

@@ -6,12 +6,21 @@ load_dotenv()
 GITHUB_APP_ID = os.getenv("GITHUB_APP_ID")
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PORT = int(os.getenv("PORT", 8000))
+
+# Qué proveedor usa el análisis semántico. "anthropic" (default) o "openai" —
+# útil para seguir revisando PRs si se agota el crédito de una de las dos cuentas.
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
 
 # Modelo de Claude para el análisis semántico. Haiku 4.5 es ~3x más barato que
 # Sonnet 4.6 ($1/$5 vs $3/$15 por 1M tokens). Para máxima detección de bugs,
 # poner ANTHROPIC_MODEL=claude-sonnet-4-6 en el entorno.
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
+
+# Modelo de OpenAI para el análisis semántico (solo si LLM_PROVIDER=openai).
+# gpt-4o-mini es el equivalente en costo/calidad a Haiku 4.5.
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # Tope de caracteres del diff que se envía a Claude por archivo. Evita que un
 # archivo enorme dispare el costo (~4 chars/token → 12000 chars ≈ 3000 tokens).
