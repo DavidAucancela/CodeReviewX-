@@ -4,6 +4,7 @@ import json
 import logging
 import anthropic
 import openai
+from app.diff_parser import annotate_patch
 from config.settings import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL,
@@ -106,7 +107,9 @@ Lenguaje: {language}
 Issues detectados por análisis estático:
 {static_issues}
 
-Diff del PR:
+Diff del PR (cada línea está precedida por su número de línea real en el
+archivo nuevo; en blanco para headers `@@` y líneas eliminadas, que no tienen
+número en el archivo nuevo):
 ```
 {patch}
 ```
@@ -129,7 +132,7 @@ Donde {{severidad}} es uno de: 🔴 (alta), 🟡 (media), 🔵 (baja).
 {severity_filter}
 
 Responde con array JSON:
-[{{"line": <número de línea en el archivo>, "comment": "<comentario con la estructura de arriba>"}}]
+[{{"line": <copia EXACTAMENTE el número que precede a esa línea en el diff de arriba — no lo cuentes vos>, "comment": "<comentario con la estructura de arriba>"}}]
 
 Solo incluye problemas concretos y accionables. Máximo 5 comentarios por archivo."""
 
@@ -171,7 +174,7 @@ def analyze_semantically(
         filename=filename,
         language=language,
         static_issues=static_summary,
-        patch=patch,
+        patch=annotate_patch(patch),
         severity_filter=_CRITICAL_ONLY_INSTRUCTION if ONLY_CRITICAL_SEVERITY else "",
     )
 

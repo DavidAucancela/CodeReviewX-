@@ -158,6 +158,15 @@ def _run_review_pipeline(
             logger.info(f"  → {len(semantic_comments)} comentarios semánticos")
 
         inline = _build_inline_comments(ctx, semantic_comments)
+        dropped = len(semantic_comments) - len(inline)
+        if dropped > 0:
+            dropped_lines = [c.get("line") for c in semantic_comments if not (
+                c.get("line") and c["line"] in ctx["line_map"]
+            )]
+            logger.warning(
+                f"  → {dropped} comentario(s) descartado(s) en {ctx['filename']}: "
+                f"línea fuera del diff (line_map) — líneas reportadas: {dropped_lines}"
+            )
         all_inline.extend(inline)
         file_results.append((ctx, semantic_comments))
 

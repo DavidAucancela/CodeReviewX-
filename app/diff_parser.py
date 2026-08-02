@@ -17,15 +17,14 @@ def filter_supported_files(pr_files: list[dict]) -> list[dict]:
     return result
 
 
-def parse_diff_lines(patch: str) -> dict[int, int]:
+def _iter_patch_lines(patch: str):
     """
-    Convierte el patch de GitHub en un mapa {line_number: diff_position}.
-    diff_position es lo que necesita la API de GitHub para comentarios inline.
+    Recorre un patch de GitHub línea por línea, calculando para cada una su
+    número de línea real en el archivo nuevo (None si no aplica: headers @@ o
+    líneas eliminadas) y su posición absoluta en el patch (para la API de
+    comentarios de GitHub). Compartido por parse_diff_lines y annotate_patch
+    para que ambos usen exactamente el mismo conteo de hunks.
     """
-    if not patch:
-        return {}
-
-    line_map = {}
     current_line = 0
     position = 0
 
@@ -39,19 +38,57 @@ def parse_diff_lines(patch: str) -> dict[int, int]:
                 current_line = int(after.split(",")[0]) - 1
             except (IndexError, ValueError):
                 pass
+            yield raw_line, None, position
             continue
 
         if raw_line.startswith("-"):
             # Línea eliminada — no tiene número en el archivo nuevo
+            yield raw_line, None, position
             continue
 
         current_line += 1
+        yield raw_line, current_line, position
 
-        if raw_line.startswith("+"):
+
+def parse_diff_lines(patch: str) -> dict[int, int]:
+    """
+    Convierte el patch de GitHub en un mapa {line_number: diff_position}.
+    diff_position es lo que necesita la API de GitHub para comentarios inline.
+    """
+    if not patch:
+        return {}
+
+    line_map = {}
+
+    for raw_line, real_line, position in _iter_patch_lines(patch):
+        if real_line is not None and raw_line.startswith("+"):
             # Línea agregada — es la que podemos comentar
-            line_map[current_line] = position
+            line_map[real_line] = position
 
     return line_map
+
+
+def annotate_patch(patch: str) -> str:
+    """
+    Reescribe el patch prefijando cada línea con su número de línea real en el
+    archivo nuevo (en blanco para headers @@ y líneas eliminadas, que no
+    tienen número en el archivo nuevo).
+
+    El LLM recibe este texto en vez del patch crudo para que copie el número
+    de línea en lugar de tener que contarlo manualmente desde los headers
+    @@ -a,b +c,d @@ — modelos distintos infieren ese conteo con distinta
+    fiabilidad, y un desajuste hace que _build_inline_comments descarte el
+    comentario en silencio (su línea nunca cae en line_map).
+    """
+    if not patch:
+        return patch
+
+    out = []
+    for raw_line, real_line, _ in _iter_patch_lines(patch):
+        prefix = f"{real_line:>5} " if real_line is not None else "      "
+        out.append(prefix + raw_line)
+
+    return "\n".join(out)
 
 
 def extract_file_contexts(pr_files: list[dict]) -> list[dict]:
