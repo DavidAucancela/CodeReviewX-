@@ -67,6 +67,7 @@ async def webhook(
             repo=pr_data["repo_full_name"],
             pr_number=pr_data["pr_number"],
             installation_id=pr_data["installation_id"],
+            head_sha=pr_data["head_sha"],
         )
     )
 

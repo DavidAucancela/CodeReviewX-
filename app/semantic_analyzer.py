@@ -9,6 +9,7 @@ from config.settings import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL,
     LLM_PROVIDER,
+    MAX_FILE_CONTEXT_CHARS,
     MAX_PATCH_CHARS,
     ONLY_CRITICAL_SEVERITY,
     OPENAI_API_KEY,
@@ -106,7 +107,7 @@ Lenguaje: {language}
 
 Issues detectados por análisis estático:
 {static_issues}
-
+{full_file_section}
 Diff del PR (cada línea está precedida por su número de línea real en el
 archivo nuevo; en blanco para headers `@@` y líneas eliminadas, que no tienen
 número en el archivo nuevo):
@@ -136,6 +137,15 @@ Responde con array JSON:
 
 Solo incluye problemas concretos y accionables. Máximo 5 comentarios por archivo."""
 
+_FULL_FILE_SECTION_TEMPLATE = """
+Archivo completo (para contexto — NO reportes problemas de código
+preexistente que no forme parte del diff de arriba; úsalo solo para
+entender qué hacen las funciones/variables/clases que el diff referencia):
+```
+{full_file}
+```
+"""
+
 _CRITICAL_ONLY_INSTRUCTION = (
     "IMPORTANTE: Reporta ÚNICAMENTE problemas de severidad 🔴 (alta): "
     "vulnerabilidades de seguridad, crashes, lógica rota que causa fallos en "
@@ -150,9 +160,12 @@ def analyze_semantically(
     language: str,
     patch: str,
     static_issues: list[dict],
+    full_file: str | None = None,
 ) -> list[dict]:
     """
     Analiza el diff con el LLM configurado (LLM_PROVIDER) y retorna lista de {line, comment}.
+    full_file (opcional): contenido completo del archivo, usado solo como
+    contexto para resolver símbolos/funciones fuera del hunk visible.
     """
     if not patch:
         return []
@@ -170,10 +183,17 @@ def analyze_semantically(
         else "  Ninguno"
     )
 
+    full_file_section = ""
+    if full_file:
+        if len(full_file) > MAX_FILE_CONTEXT_CHARS:
+            full_file = full_file[:MAX_FILE_CONTEXT_CHARS] + "\n... (archivo truncado por longitud)"
+        full_file_section = _FULL_FILE_SECTION_TEMPLATE.format(full_file=full_file)
+
     prompt = USER_PROMPT_TEMPLATE.format(
         filename=filename,
         language=language,
         static_issues=static_summary,
+        full_file_section=full_file_section,
         patch=annotate_patch(patch),
         severity_filter=_CRITICAL_ONLY_INSTRUCTION if ONLY_CRITICAL_SEVERITY else "",
     )

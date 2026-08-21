@@ -9,20 +9,27 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def analyze_python(code: str, filename: str) -> list[dict]:
+def analyze_python(code: str, filename: str, file_path: str | None = None) -> list[dict]:
     """
-    Corre ruff sobre el contenido del archivo Python.
+    Corre ruff sobre el archivo Python. Si file_path apunta a un archivo real
+    dentro de un repo clonado, lo analiza ahí mismo (imports y pyproject.toml
+    reales se resuelven). Si no, cae al modo aislado: escribe `code` (hoy,
+    solo las líneas '+' del diff) a un temp file sin contexto del proyecto.
     Retorna lista de {line, message, code}.
     """
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False, encoding="utf-8"
-    ) as tmp:
-        tmp.write(code)
-        tmp_path = tmp.name
+    tmp_path = None
+    target_path = file_path
+    if target_path is None:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp.write(code)
+            tmp_path = tmp.name
+        target_path = tmp_path
 
     try:
         result = subprocess.run(
-            ["ruff", "check", "--output-format=json", tmp_path],
+            ["ruff", "check", "--output-format=json", target_path],
             capture_output=True,
             text=True,
         )
@@ -43,28 +50,36 @@ def analyze_python(code: str, filename: str) -> list[dict]:
         logger.error(f"Error en análisis Python: {e}")
         return []
     finally:
-        os.unlink(tmp_path)
+        if tmp_path:
+            os.unlink(tmp_path)
 
 
-def analyze_javascript(code: str, filename: str) -> list[dict]:
+def analyze_javascript(code: str, filename: str, file_path: str | None = None) -> list[dict]:
     """
-    Corre eslint sobre el contenido JS/TS.
+    Corre eslint sobre el archivo JS/TS. Con file_path (repo clonado) usa el
+    .eslintrc real del proyecto; en modo aislado fuerza --no-eslintrc y un
+    entorno genérico porque no hay config del proyecto disponible.
     Retorna lista de {line, message, rule}.
     """
-    ext = os.path.splitext(filename)[1] or ".js"
+    tmp_path = None
+    target_path = file_path
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=ext, delete=False, encoding="utf-8"
-    ) as tmp:
-        tmp.write(code)
-        tmp_path = tmp.name
+    if target_path is None:
+        ext = os.path.splitext(filename)[1] or ".js"
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=ext, delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp.write(code)
+            tmp_path = tmp.name
+        target_path = tmp_path
+
+    cmd = ["eslint", "--format=json"]
+    if tmp_path:
+        cmd += ["--no-eslintrc", "--env=es2021,node"]
+    cmd.append(target_path)
 
     try:
-        result = subprocess.run(
-            ["eslint", "--format=json", "--no-eslintrc", "--env=es2021,node", tmp_path],
-            capture_output=True,
-            text=True,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True)
         issues = []
         if result.stdout:
             raw = json.loads(result.stdout)
@@ -83,12 +98,15 @@ def analyze_javascript(code: str, filename: str) -> list[dict]:
         logger.error(f"Error en análisis JS: {e}")
         return []
     finally:
-        os.unlink(tmp_path)
+        if tmp_path:
+            os.unlink(tmp_path)
 
 
-def run_static_analysis(language: str, code: str, filename: str) -> list[dict]:
+def run_static_analysis(
+    language: str, code: str, filename: str, file_path: str | None = None
+) -> list[dict]:
     if language == "python":
-        return analyze_python(code, filename)
+        return analyze_python(code, filename, file_path)
     elif language in ("javascript", "typescript"):
-        return analyze_javascript(code, filename)
+        return analyze_javascript(code, filename, file_path)
     return []
