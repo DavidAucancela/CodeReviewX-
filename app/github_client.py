@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 import time
 import jwt
@@ -54,6 +55,41 @@ def get_pr_files(repo: str, pr_number: int, token: str) -> list[dict]:
         )
         resp.raise_for_status()
         return resp.json()
+
+
+def get_file_content(repo: str, filename: str, ref: str, token: str) -> str | None:
+    """
+    Trae el contenido completo de un archivo en un commit específico (Contents API).
+    Usado como contexto para el análisis semántico y como fallback cuando el
+    repo no se clona (ENABLE_REPO_CLONE=false o clonado falló).
+    Retorna None si el archivo no existe en ese ref, es demasiado grande para
+    la Contents API (>1MB, sin campo "content") o cualquier otro error.
+    """
+    url = f"{GITHUB_API}/repos/{repo}/contents/{filename}"
+
+    try:
+        with httpx.Client() as client:
+            resp = client.get(
+                url,
+                params={"ref": ref},
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github+json",
+                },
+            )
+            if resp.status_code != 200:
+                logger.warning(f"No se pudo obtener {filename}@{ref}: HTTP {resp.status_code}")
+                return None
+
+            data = resp.json()
+            content_b64 = data.get("content")
+            if not content_b64:
+                return None
+
+            return base64.b64decode(content_b64).decode("utf-8", errors="replace")
+    except Exception as e:
+        logger.warning(f"Error obteniendo contenido de {filename}@{ref}: {e}")
+        return None
 
 
 def post_review(

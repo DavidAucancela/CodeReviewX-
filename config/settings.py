@@ -58,6 +58,20 @@ RISKY_FILE_PATTERNS = [
 ]
 RISKY_PATCH_SIZE = int(os.getenv("RISKY_PATCH_SIZE", 300))
 
+# --- Contexto de proyecto completo (reduce falsos positivos) ---
+
+# Si es true, clona el repo al SHA del PR antes de analizar. Permite correr
+# Ruff/ESLint sobre el archivo real (con imports y config del proyecto
+# resueltos) y darle al LLM el archivo completo, no solo el diff. Si falla o
+# está desactivado, el pipeline cae a pedir el archivo completo vía la
+# Contents API (más liviano, sin resolver Ruff/ESLint).
+ENABLE_REPO_CLONE = os.getenv("ENABLE_REPO_CLONE", "false").lower() == "true"
+CLONE_TIMEOUT_SECONDS = int(os.getenv("CLONE_TIMEOUT_SECONDS", 30))
+
+# Tope de caracteres del archivo completo inyectado como contexto en el
+# prompt semántico (separado de MAX_PATCH_CHARS, que acota el diff).
+MAX_FILE_CONTEXT_CHARS = int(os.getenv("MAX_FILE_CONTEXT_CHARS", 20000))
+
 # LLM Observatory — métricas de uso de Claude
 OBSERVATORY_URL = os.getenv("OBSERVATORY_URL", "https://llm-web-production.up.railway.app")
 OBSERVATORY_TOKEN = os.getenv("OBSERVATORY_TOKEN")  # obs_sk_...; si falta, no se envían métricas

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
-from app.github_client import get_installation_token, get_pr_files, post_review
+import os
+from app.github_client import get_installation_token, get_pr_files, get_file_content, post_review
 from app.diff_parser import extract_file_contexts
+from app.repo_context import clone_pr_repo, cleanup_repo, read_file
 from app.static_analyzer import run_static_analysis
 from app.semantic_analyzer import analyze_semantically
 from config.settings import (
+    ENABLE_REPO_CLONE,
     MAX_INLINE_COMMENTS,
     TWO_PASS_MODE,
     RISKY_FILES_ONLY,
@@ -97,6 +100,7 @@ def run_review_pipeline(
     repo: str,
     pr_number: int,
     installation_id: int,
+    head_sha: str | None = None,
 ) -> None:
     """Pipeline completo: obtiene diff → analiza → publica comentarios.
 
@@ -104,7 +108,7 @@ def run_review_pipeline(
     de lo contrario desaparecería sin rastro (el webhook ya respondió 200).
     """
     try:
-        _run_review_pipeline(repo, pr_number, installation_id)
+        _run_review_pipeline(repo, pr_number, installation_id, head_sha)
     except Exception:
         logger.exception(f"Pipeline falló para {repo}#{pr_number}")
 
@@ -113,6 +117,7 @@ def _run_review_pipeline(
     repo: str,
     pr_number: int,
     installation_id: int,
+    head_sha: str | None = None,
 ) -> None:
     logger.info(f"Iniciando review: {repo}#{pr_number}")
 
@@ -124,6 +129,26 @@ def _run_review_pipeline(
         logger.info("No hay archivos soportados en el PR — nada que revisar")
         return
 
+    repo_path = None
+    if ENABLE_REPO_CLONE and head_sha:
+        repo_path = clone_pr_repo(repo, head_sha, token)
+        if not repo_path:
+            logger.warning("Clonado falló — se usa fallback de Contents API por archivo")
+
+    try:
+        _analyze_and_review(repo, pr_number, token, head_sha, file_contexts, repo_path)
+    finally:
+        cleanup_repo(repo_path)
+
+
+def _analyze_and_review(
+    repo: str,
+    pr_number: int,
+    token: str,
+    head_sha: str | None,
+    file_contexts: list[dict],
+    repo_path: str | None,
+) -> None:
     # Acumula (ctx, semantic_comments) y todos los candidatos a inline
     file_results: list[tuple[dict, list[dict]]] = []
     all_inline: list[dict] = []
@@ -131,12 +156,24 @@ def _run_review_pipeline(
     for ctx in file_contexts:
         logger.info(f"Analizando {ctx['filename']} ({ctx['language']})")
 
+        # Contexto de archivo completo: del clon si existe, si no vía Contents
+        # API. Reduce falsos positivos por símbolos definidos fuera del hunk.
+        full_file = None
+        if repo_path:
+            full_file = read_file(repo_path, ctx["filename"])
+        elif head_sha:
+            full_file = get_file_content(repo, ctx["filename"], head_sha, token)
+        logger.info(f"  → contexto de archivo completo: {'sí' if full_file else 'no'}")
+
         new_code_lines = [
             line[1:] for line in ctx["patch"].splitlines() if line.startswith("+")
         ]
         new_code = "\n".join(new_code_lines)
 
-        static_issues = run_static_analysis(ctx["language"], new_code, ctx["filename"])
+        file_path = os.path.join(repo_path, ctx["filename"]) if repo_path else None
+        static_issues = run_static_analysis(
+            ctx["language"], new_code, ctx["filename"], file_path
+        )
         logger.info(f"  → {len(static_issues)} issues estáticos")
 
         skip_reason = None
@@ -154,6 +191,7 @@ def _run_review_pipeline(
                 language=ctx["language"],
                 patch=ctx["patch"],
                 static_issues=static_issues,
+                full_file=full_file,
             )
             logger.info(f"  → {len(semantic_comments)} comentarios semánticos")
 
