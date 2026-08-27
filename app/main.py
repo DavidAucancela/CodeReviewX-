@@ -1,5 +1,5 @@
 import logging
-import asyncio
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Header
 
@@ -60,15 +60,22 @@ async def webhook(
 
     logger.info(f"PR recibido: {pr_data['repo_full_name']}#{pr_data['pr_number']} ({pr_data['action']})")
 
-    # Corre el pipeline en background para no bloquear la respuesta al webhook
-    asyncio.create_task(
-        asyncio.to_thread(
-            run_review_pipeline,
-            repo=pr_data["repo_full_name"],
-            pr_number=pr_data["pr_number"],
-            installation_id=pr_data["installation_id"],
-            head_sha=pr_data["head_sha"],
-        )
-    )
+    # Corre el pipeline en un hilo dedicado no-daemon, no en el event loop:
+    #  - una tarea de asyncio.create_task sin referencia guardada puede ser
+    #    recolectada por el GC a mitad de camino, y el loop la cancela en el
+    #    shutdown → el review desaparecía sin postear nada.
+    #  - un hilo no-daemon corre independiente del loop y mantiene vivo el
+    #    proceso hasta terminar, así ni un apagado ordenado corta el review.
+    threading.Thread(
+        target=run_review_pipeline,
+        kwargs={
+            "repo": pr_data["repo_full_name"],
+            "pr_number": pr_data["pr_number"],
+            "installation_id": pr_data["installation_id"],
+            "head_sha": pr_data["head_sha"],
+        },
+        name=f"review-{pr_data['repo_full_name']}#{pr_data['pr_number']}",
+        daemon=False,
+    ).start()
 
     return {"status": "processing", "pr": pr_data["pr_number"]}
