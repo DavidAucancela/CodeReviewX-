@@ -5,6 +5,7 @@ import logging
 import anthropic
 import openai
 from app.diff_parser import annotate_patch
+from app.patterns_store import as_prompt_texts, load_local
 from config.settings import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL,
@@ -147,14 +148,10 @@ entender qué hacen las funciones/variables/clases que el diff referencia):
 ```
 """
 
-# Patrones que el modelo reportó antes pero que NO son problemas reales.
-# Se edita a mano según lo que se vaya observando en los PRs revisados —
-# cada entrada nueva reduce falsos positivos futuros del mismo tipo.
-KNOWN_FALSE_POSITIVES: list[str] = [
-    # Ejemplo: "Marcar `except Exception` genérico como problema cuando ya
-    # loguea el error y el caller no depende de la excepción específica.",
-]
-
+# Patrones confirmados como falsos positivos. Antes vivían hardcodeados acá;
+# ahora se administran vía config/false_positives.json (editable a mano o
+# desde el panel /patterns, ver app/patterns_store.py) para tener historial
+# de cambios (git log) sin tocar código.
 _FALSE_POSITIVES_SECTION_TEMPLATE = """
 Patrones que reportaste antes en este proyecto pero que el equipo confirmó
 que NO son problemas reales — no los repitas salvo que el caso concreto sea
@@ -164,9 +161,10 @@ claramente distinto:
 
 
 def _false_positives_section() -> str:
-    if not KNOWN_FALSE_POSITIVES:
+    texts = as_prompt_texts(load_local())
+    if not texts:
         return ""
-    items = "\n".join(f"- {item}" for item in KNOWN_FALSE_POSITIVES)
+    items = "\n".join(f"- {item}" for item in texts)
     return _FALSE_POSITIVES_SECTION_TEMPLATE.format(items=items)
 
 

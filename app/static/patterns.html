@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de Patrones — CodeReviewX</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #edf1f4; --surface: #ffffff; --surface-sunken: #e4e9ed;
+    --border: #d4dce1; --border-strong: #b7c2c9;
+    --text: #17222c; --text-muted: #55636e; --text-faint: #8492a0;
+    --accent: #a75a1d; --accent-soft: #f3e4d4; --accent-strong: #7f4315;
+    --sev-high: #c23b3b; --sev-med: #b8860f; --sev-low: #3468b0; --ok: #2f7d5c;
+    --danger: #b23b3b; --danger-soft: #f6e2e2;
+    --shadow: 0 1px 2px rgba(23,34,44,.06), 0 8px 24px -12px rgba(23,34,44,.18);
+    --radius: 10px;
+    --font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#10161c; --surface:#182129; --surface-sunken:#0d1218;
+      --border:#2a3743; --border-strong:#3c4c59;
+      --text:#e7ecef; --text-muted:#a3b1bb; --text-faint:#6d7d89;
+      --accent:#e3a15a; --accent-soft:#3a2c1c; --accent-strong:#f0b877;
+      --sev-high:#e2726c; --sev-med:#dcb24f; --sev-low:#6ba3e8; --ok:#5cbd93;
+      --danger:#e2726c; --danger-soft:#3a2020;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#10161c; --surface:#182129; --surface-sunken:#0d1218;
+    --border:#2a3743; --border-strong:#3c4c59;
+    --text:#e7ecef; --text-muted:#a3b1bb; --text-faint:#6d7d89;
+    --accent:#e3a15a; --accent-soft:#3a2c1c; --accent-strong:#f0b877;
+    --sev-high:#e2726c; --sev-med:#dcb24f; --sev-low:#6ba3e8; --ok:#5cbd93;
+    --danger:#e2726c; --danger-soft:#3a2020;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
+    padding: 0 20px 64px;
+  }
+  h1,h2 { text-wrap: balance; margin: 0; }
+  code, .mono { font-family: var(--font-mono); }
+  a { color: inherit; }
+  .shell { max-width: 1180px; margin: 0 auto; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; padding: 22px 0 18px;
+    border-bottom: 1px solid var(--border); margin-bottom: 28px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand-mark {
+    font-family: var(--font-mono); font-weight: 600; font-size: 13px;
+    letter-spacing: .06em; color: var(--accent-strong);
+    background: var(--accent-soft); padding: 3px 8px; border-radius: 6px;
+  }
+  .brand h1 { font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+  .brand-sub { color: var(--text-faint); font-size: 13px; }
+  .status-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
+    padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-muted); white-space: nowrap;
+  }
+  .pill b { color: var(--text); font-weight: 600; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+    background: var(--border); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 32px;
+  }
+  .stat { background: var(--surface); padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+  .stat .n { font-family: var(--font-mono); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .stat .l { font-size: 12.5px; color: var(--text-muted); }
+
+  .layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .panel-head h2 { font-size: 14.5px; font-weight: 600; }
+  .panel-head .count { font-family: var(--font-mono); color: var(--text-faint); font-size: 13px; }
+  .panel-body { padding: 4px 0; }
+  .empty { padding: 28px 20px; color: var(--text-faint); font-size: 13.5px; text-align: center; }
+
+  .pattern { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .pattern:last-child { border-bottom: none; }
+  .pattern-icon {
+    width: 28px; height: 28px; border-radius: 7px; background: var(--surface-sunken);
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--text-muted); margin-top: 1px;
+  }
+  .pattern-text { font-size: 14px; color: var(--text); }
+  .pattern-text code { font-size: 12.5px; background: var(--surface-sunken); padding: 1px 5px; border-radius: 4px; color: var(--accent-strong); }
+  .pattern-meta { margin-top: 9px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .pattern-meta span { font-size: 12px; color: var(--text-faint); display: inline-flex; align-items: center; gap: 5px; }
+  .pattern-actions { margin-left: auto; display: flex; gap: 6px; }
+  .icon-btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+    padding: 4px 9px; border-radius: 6px; font-size: 12px; font-family: var(--font-ui);
+    cursor: pointer;
+  }
+  .icon-btn:hover { border-color: var(--danger); color: var(--danger); }
+  .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .icon-btn:disabled { opacity: .5; cursor: wait; }
+
+  .add-form { padding: 16px 20px; border-top: 1px dashed var(--border); background: var(--surface-sunken); border-radius: 0 0 var(--radius) var(--radius); }
+  .add-form label { display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
+  .add-form textarea, .add-form input[type=text] {
+    width: 100%; resize: vertical; min-height: 64px; font-family: var(--font-ui); font-size: 13.5px;
+    color: var(--text); background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 7px; padding: 10px 12px;
+  }
+  .add-form input[type=text] { min-height: unset; margin-top: 10px; }
+  .add-form textarea:focus-visible, .add-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .form-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 10px; flex-wrap: wrap; }
+  .hint { font-size: 12px; color: var(--text-faint); }
+  .btn { font-family: var(--font-ui); font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 7px; border: 1px solid transparent; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: #fff8f0; }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-primary:disabled { opacity: .6; cursor: wait; }
+  .btn-primary:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+  .history-item { padding: 15px 20px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 14px 1fr; gap: 12px; }
+  .history-item:last-child { border-bottom: none; }
+  .history-rail { position: relative; display: flex; justify-content: center; }
+  .history-rail::before { content: ""; position: absolute; top: 4px; bottom: -19px; width: 1px; background: var(--border); }
+  .history-item:last-child .history-rail::before { display: none; }
+  .history-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ok); margin-top: 3px; z-index: 1; }
+  .history-title { font-size: 13.5px; font-weight: 500; }
+  .history-sub { margin-top: 3px; font-size: 12px; color: var(--text-faint); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .history-sub code { font-size: 11.5px; background: var(--surface-sunken); padding: 1px 5px; border-radius: 4px; }
+  .history-sub a { text-decoration: none; }
+  .history-sub a:hover { text-decoration: underline; }
+
+  .banner {
+    display: none; margin-bottom: 20px; padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; border: 1px solid;
+  }
+  .banner.show { display: block; }
+  .banner.err { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+  .banner.ok { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+
+  footer.notice { max-width: 1180px; margin: 28px auto 0; font-size: 12.5px; color: var(--text-faint); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">CRX</span>
+      <div>
+        <h1>Panel de Patrones</h1>
+        <div class="brand-sub" id="repo-label">CodeReviewX</div>
+      </div>
+    </div>
+    <div class="status-row" id="status-row">
+      <span class="pill"><span class="dot"></span> cargando…</span>
+    </div>
+  </div>
+
+  <div id="banner" class="banner"></div>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="stat-patterns">—</div><div class="l">patrones activos</div></div>
+    <div class="stat"><div class="n" id="stat-history">—</div><div class="l">commits sobre este archivo</div></div>
+    <div class="stat"><div class="n" id="stat-latest">—</div><div class="l">último cambio</div></div>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Patrones activos</h2>
+        <span class="count">config/false_positives.json</span>
+      </div>
+      <div class="panel-body" id="patterns-list">
+        <div class="empty">Cargando patrones…</div>
+      </div>
+
+      <form class="add-form" id="add-form">
+        <label for="new-text">Nuevo patrón (describe el caso general, no la línea puntual)</label>
+        <textarea id="new-text" required placeholder="Ej.: no marcar console.log en archivos de script de un solo uso…"></textarea>
+        <input type="text" id="new-source" placeholder="Origen (opcional): archivo o PR donde lo viste">
+        <div class="form-row">
+          <span class="hint">Se guarda como commit directo a <code class="mono">main</code> — Railway redespliega solo.</span>
+          <button class="btn btn-primary" type="submit" id="add-btn">Agregar patrón</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Historial</h2>
+        <span class="count">git log</span>
+      </div>
+      <div class="panel-body" id="history-list">
+        <div class="empty">Cargando historial…</div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="notice">
+    Los cambios se aplican al repo real (<span id="repo-label-2"></span>) — cada acción es un commit visible en GitHub.
+  </footer>
+</div>
+
+<script>
+const API = "/patterns/api";
+
+function getToken() {
+  let t = localStorage.getItem("crx_admin_token");
+  if (!t) {
+    t = prompt("Token de administrador (PATTERNS_ADMIN_TOKEN):") || "";
+    if (t) localStorage.setItem("crx_admin_token", t);
+  }
+  return t;
+}
+
+function showBanner(msg, kind) {
+  const el = document.getElementById("banner");
+  el.textContent = msg;
+  el.className = "banner show " + kind;
+  setTimeout(() => el.classList.remove("show"), 5000);
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function renderInlineCode(text) {
+  // el texto de los patrones usa `código` estilo markdown — solo eso, nada más
+  return escapeHtml(text).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function timeAgo(iso) {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 3600) return Math.max(1, Math.round(diff/60)) + "m";
+  if (diff < 86400) return Math.round(diff/3600) + "h";
+  return Math.round(diff/86400) + "d";
+}
+
+async function load() {
+  const res = await fetch(API);
+  if (!res.ok) {
+    showBanner("No se pudo cargar el panel (HTTP " + res.status + ")", "err");
+    return;
+  }
+  const data = await res.json();
+
+  document.getElementById("repo-label").textContent = data.repo;
+  document.getElementById("repo-label-2").textContent = data.repo;
+  document.getElementById("status-row").innerHTML =
+    `<span class="pill"><span class="dot"></span> bot activo</span>
+     <span class="pill">proveedor <b>${escapeHtml(data.provider)}</b></span>
+     <span class="pill">modelo <b class="mono">${escapeHtml(data.model)}</b></span>`;
+
+  document.getElementById("stat-patterns").textContent = data.patterns.length;
+  document.getElementById("stat-history").textContent = data.history.length;
+  document.getElementById("stat-latest").textContent =
+    data.history.length ? timeAgo(data.history[0].date) : "—";
+
+  const list = document.getElementById("patterns-list");
+  if (!data.patterns.length) {
+    list.innerHTML = '<div class="empty">Sin patrones todavía — agregá el primero abajo.</div>';
+  } else {
+    list.innerHTML = data.patterns.map(p => `
+      <div class="pattern" data-id="${escapeHtml(p.id)}">
+        <div class="pattern-icon">⌁</div>
+        <div>
+          <div class="pattern-text">${renderInlineCode(p.text)}</div>
+          <div class="pattern-meta">
+            <span>agregado ${escapeHtml(p.added_at || "—")}</span>
+            ${p.source ? `<span>origen: ${escapeHtml(p.source)}</span>` : ""}
+            <span class="pattern-actions">
+              <button class="icon-btn" data-remove="${escapeHtml(p.id)}">Quitar</button>
+            </span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  const hist = document.getElementById("history-list");
+  hist.innerHTML = data.history.length
+    ? data.history.map(h => `
+      <div class="history-item">
+        <div class="history-rail"><div class="history-dot"></div></div>
+        <div>
+          <div class="history-title">${escapeHtml(h.message)}</div>
+          <div class="history-sub">
+            <span>${new Date(h.date).toLocaleDateString("es")}</span>
+            <a href="${h.url}" target="_blank" rel="noopener"><code class="mono">${h.sha}</code></a>
+          </div>
+        </div>
+      </div>
+    `).join("")
+    : '<div class="empty">Sin historial todavía.</div>';
+}
+
+document.getElementById("add-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = document.getElementById("new-text").value.trim();
+  const source = document.getElementById("new-source").value.trim();
+  if (!text) return;
+
+  const btn = document.getElementById("add-btn");
+  btn.disabled = true;
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": getToken() },
+      body: JSON.stringify({ text, source }),
+    });
+    if (!res.ok) {
+      if (res.status === 401) localStorage.removeItem("crx_admin_token");
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || ("HTTP " + res.status));
+    }
+    document.getElementById("new-text").value = "";
+    document.getElementById("new-source").value = "";
+    showBanner("Patrón agregado y commiteado a main.", "ok");
+    await load();
+  } catch (err) {
+    showBanner("Error al agregar: " + err.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("patterns-list").addEventListener("click", async (e) => {
+  const id = e.target.getAttribute("data-remove");
+  if (!id) return;
+  if (!confirm("¿Quitar este patrón? Se commitea a main.")) return;
+
+  e.target.disabled = true;
+  try {
+    const res = await fetch(`${API}/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { "X-Admin-Token": getToken() },
+    });
+    if (!res.ok) {
+      if (res.status === 401) localStorage.removeItem("crx_admin_token");
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || ("HTTP " + res.status));
+    }
+    showBanner("Patrón quitado y commiteado a main.", "ok");
+    await load();
+  } catch (err) {
+    showBanner("Error al quitar: " + err.message, "err");
+    e.target.disabled = false;
+  }
+});
+
+load();
+</script>
+</body>
+</html>

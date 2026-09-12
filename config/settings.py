@@ -87,3 +87,18 @@ def get_private_key() -> str:
         return f.read()
 
 SUPPORTED_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx"}
+
+# --- Panel de patrones (falsos positivos conocidos) ---
+
+# Repo propio (no el de los PRs que se revisan) donde vive
+# config/false_positives.json y donde el panel /patterns commitea los cambios.
+SELF_REPO = os.getenv("SELF_REPO", "DavidAucancela/CodeReviewX-")
+
+# La App ya está instalada en todos los repos de la cuenta (ver memoria del
+# proyecto), así que un solo installation_id sirve tanto para revisar PRs
+# ajenos como para commitear en este propio repo.
+GITHUB_INSTALLATION_ID = int(os.getenv("GITHUB_INSTALLATION_ID", "117155385"))
+
+# Token que protege los endpoints de escritura de /patterns (agregar/quitar
+# patrones). Sin él, esos endpoints devuelven 503 en vez de quedar abiertos.
+PATTERNS_ADMIN_TOKEN = os.getenv("PATTERNS_ADMIN_TOKEN")

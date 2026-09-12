@@ -1,0 +1,20 @@
+[
+  {
+    "id": "optional-chaining-ya-maneja-null",
+    "text": "Marcar un acceso con encadenamiento opcional (`p?.title`, `data?.foo`) como riesgo de null/undefined — el `?.` ya es el manejo del caso nulo. Solo reportar si el resultado se usa después sin ningún respaldo.",
+    "source": "js/ia-mascot.js, js/project-gallery.js",
+    "added_at": "2026-09-12"
+  },
+  {
+    "id": "undefined-en-texto-cosmetico",
+    "text": "Reportar que un valor puede quedar `undefined`/vacío cuando solo se usa para interpolar texto cosmético (título, `aria-label`, `alt`, placeholder) — como mucho es 🔵, nunca 🔴 ni 🟡.",
+    "source": "js/project-gallery.js, js/projects.js",
+    "added_at": "2026-09-12"
+  },
+  {
+    "id": "no-repetir-mismo-patron-en-archivo",
+    "text": "No repetir el mismo patrón varias veces dentro de un archivo (ej. varias llamadas a `LangSwitcher.L(...)`) — señalarlo una vez alcanza, salvo que el caso sea claramente distinto.",
+    "source": "js/ia-mascot.js (4 líneas casi idénticas)",
+    "added_at": "2026-09-12"
+  }
+]
