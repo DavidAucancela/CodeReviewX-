@@ -115,6 +115,7 @@ número en el archivo nuevo):
 {patch}
 ```
 
+{false_positives_section}
 Identifica problemas en las líneas NUEVAS (líneas con +) del diff:
 1. Bugs lógicos o edge cases no manejados
 2. Código que puede fallar en producción (null refs, excepciones no capturadas, async mal usado)
@@ -145,6 +146,29 @@ entender qué hacen las funciones/variables/clases que el diff referencia):
 {full_file}
 ```
 """
+
+# Patrones que el modelo reportó antes pero que NO son problemas reales.
+# Se edita a mano según lo que se vaya observando en los PRs revisados —
+# cada entrada nueva reduce falsos positivos futuros del mismo tipo.
+KNOWN_FALSE_POSITIVES: list[str] = [
+    # Ejemplo: "Marcar `except Exception` genérico como problema cuando ya
+    # loguea el error y el caller no depende de la excepción específica.",
+]
+
+_FALSE_POSITIVES_SECTION_TEMPLATE = """
+Patrones que reportaste antes en este proyecto pero que el equipo confirmó
+que NO son problemas reales — no los repitas salvo que el caso concreto sea
+claramente distinto:
+{items}
+"""
+
+
+def _false_positives_section() -> str:
+    if not KNOWN_FALSE_POSITIVES:
+        return ""
+    items = "\n".join(f"- {item}" for item in KNOWN_FALSE_POSITIVES)
+    return _FALSE_POSITIVES_SECTION_TEMPLATE.format(items=items)
+
 
 _CRITICAL_ONLY_INSTRUCTION = (
     "IMPORTANTE: Reporta ÚNICAMENTE problemas de severidad 🔴 (alta): "
@@ -196,6 +220,7 @@ def analyze_semantically(
         full_file_section=full_file_section,
         patch=annotate_patch(patch),
         severity_filter=_CRITICAL_ONLY_INSTRUCTION if ONLY_CRITICAL_SEVERITY else "",
+        false_positives_section=_false_positives_section(),
     )
 
     try:
