@@ -1,7 +1,11 @@
 import logging
 import threading
 from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI, Request, HTTPException, Header
+from fastapi.responses import HTMLResponse, FileResponse
+from pydantic import BaseModel
 
 # Configura logging ANTES de importar los módulos de la app: semantic_analyzer
 # loguea el proveedor al importarse, y sin esto el root logger está en WARNING
@@ -14,7 +18,8 @@ logging.basicConfig(
 from app.webhook_handler import verify_signature, parse_pr_event  # noqa: E402
 from app.pipeline import run_review_pipeline  # noqa: E402
 from app.semantic_analyzer import MODEL  # noqa: E402
-from config.settings import LLM_PROVIDER  # noqa: E402
+from app import patterns_store  # noqa: E402
+from config.settings import LLM_PROVIDER, PATTERNS_ADMIN_TOKEN, SELF_REPO  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +41,71 @@ def health():
     # Expone el proveedor/modelo activo para poder verificar la configuración
     # sin abrir un PR de prueba. No incluye ninguna credencial.
     return {"status": "ok", "provider": LLM_PROVIDER, "model": MODEL}
+
+
+_STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _check_admin_token(x_admin_token: str | None) -> None:
+    if not PATTERNS_ADMIN_TOKEN:
+        raise HTTPException(status_code=503, detail="PATTERNS_ADMIN_TOKEN no configurado")
+    if x_admin_token != PATTERNS_ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+
+class NewPattern(BaseModel):
+    text: str
+    source: str = ""
+
+
+@app.get("/patterns", response_class=HTMLResponse)
+def patterns_page():
+    return FileResponse(_STATIC_DIR / "patterns.html")
+
+
+@app.get("/patterns/api")
+def patterns_list():
+    try:
+        history = patterns_store.fetch_history()
+    except Exception as e:
+        # El historial es un extra informativo — si GitHub falla (rate limit,
+        # credenciales locales incompletas), la lista de patrones igual debe
+        # cargar.
+        logger.warning(f"No se pudo traer el historial de patrones: {e}")
+        history = []
+
+    return {
+        "repo": SELF_REPO,
+        "provider": LLM_PROVIDER,
+        "model": MODEL,
+        "patterns": patterns_store.load_local(),
+        "history": history,
+    }
+
+
+@app.post("/patterns/api")
+def patterns_add(body: NewPattern, x_admin_token: str = Header(None)):
+    _check_admin_token(x_admin_token)
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="El patrón no puede estar vacío")
+    try:
+        return patterns_store.add_pattern(body.text.strip(), body.source.strip())
+    except Exception:
+        logger.exception("Error commiteando patrón nuevo")
+        raise HTTPException(status_code=502, detail="No se pudo commitear a GitHub")
+
+
+@app.delete("/patterns/api/{pattern_id}")
+def patterns_remove(pattern_id: str, x_admin_token: str = Header(None)):
+    _check_admin_token(x_admin_token)
+    try:
+        removed = patterns_store.remove_pattern(pattern_id)
+    except Exception:
+        logger.exception(f"Error commiteando la baja del patrón '{pattern_id}'")
+        raise HTTPException(status_code=502, detail="No se pudo commitear a GitHub")
+    if not removed:
+        raise HTTPException(status_code=404, detail="Patrón no encontrado")
+    return {"removed": pattern_id}
 
 
 @app.post("/webhook")

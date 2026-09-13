@@ -1,0 +1,44 @@
+[
+  {
+    "id": "optional-chaining-ya-maneja-null",
+    "text": "Marcar un acceso con encadenamiento opcional (`p?.title`, `data?.foo`) como riesgo de null/undefined — el `?.` ya es el manejo del caso nulo. Solo reportar si el resultado se usa después sin ningún respaldo.",
+    "source": "js/ia-mascot.js, js/project-gallery.js",
+    "added_at": "2026-09-12"
+  },
+  {
+    "id": "undefined-en-texto-cosmetico",
+    "text": "Reportar que un valor puede quedar `undefined`/vacío cuando solo se usa para interpolar texto cosmético (título, `aria-label`, `alt`, placeholder) — como mucho es 🔵, nunca 🔴 ni 🟡.",
+    "source": "js/project-gallery.js, js/projects.js",
+    "added_at": "2026-09-12"
+  },
+  {
+    "id": "no-repetir-mismo-patron-en-archivo",
+    "text": "No repetir el mismo patrón varias veces dentro de un archivo (ej. varias llamadas a `LangSwitcher.L(...)`) — señalarlo una vez alcanza, salvo que el caso sea claramente distinto.",
+    "source": "js/ia-mascot.js (4 líneas casi idénticas)",
+    "added_at": "2026-09-12"
+  },
+  {
+    "id": "comportamiento-documentado-no-es-bug",
+    "text": "No marcar como falla silenciosa o riesgo un `return None`/`return False`/un código de error temprano cuyo comportamiento ya está descrito en el docstring o el comentario justo arriba de la función — si está documentado a propósito, es diseño, no un bug.",
+    "source": "app/github_client.py, app/main.py (PR #12)",
+    "added_at": "2026-09-13"
+  },
+  {
+    "id": "no-inventar-rutas-de-codigo",
+    "text": "No describir una ruta de ejecución que el código no puede alcanzar — ej. decir que 'sigue haciendo X' después de una llamada que lanza excepción y corta la función, o que 'igual intenta Y' después de un `return` temprano. Verificar el orden real de las sentencias antes de reportarlo.",
+    "source": "app/patterns_store.py (PR #12): decía que un commit a GitHub se intentaba tras un return False o después de que la llamada anterior ya había lanzado una excepción",
+    "added_at": "2026-09-13"
+  },
+  {
+    "id": "consistencia-de-config-no-es-bug-nuevo",
+    "text": "No reportar que una variable de configuración/entorno 'puede recibir un valor inválido' o 'no se valida' como hallazgo aislado si ninguna otra variable del mismo archivo se valida tampoco — es una convención existente del proyecto, no un problema que introduce el diff.",
+    "source": "config/settings.py (PR #12): SELF_REPO/GITHUB_INSTALLATION_ID señaladas cuando ANTHROPIC_MODEL, GITHUB_APP_ID, etc. siguen el mismo patrón sin objeción",
+    "added_at": "2026-09-13"
+  },
+  {
+    "id": "gate-de-escritura-no-es-falla-del-sistema",
+    "text": "No describir un endpoint que devuelve 503/401 por falta de credenciales de administrador como que 'el sistema no puede operar' — precisar el alcance real: solo ese endpoint queda deshabilitado, el resto de la aplicación sigue funcionando con normalidad.",
+    "source": "app/main.py (PR #12): _check_admin_token",
+    "added_at": "2026-09-13"
+  }
+]

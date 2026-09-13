@@ -92,6 +92,85 @@ def get_file_content(repo: str, filename: str, ref: str, token: str) -> str | No
         return None
 
 
+def get_file_with_sha(repo: str, path: str, ref: str, token: str) -> tuple[str, str] | None:
+    """
+    Como get_file_content, pero además retorna el `sha` que la Contents API
+    exige para actualizar el archivo (evita pisar un cambio concurrente).
+    Retorna None si el archivo no existe o falla la llamada.
+    """
+    url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
+
+    with httpx.Client() as client:
+        resp = client.get(
+            url,
+            params={"ref": ref},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        if resp.status_code != 200:
+            logger.warning(f"No se pudo obtener {path}@{ref}: HTTP {resp.status_code}")
+            return None
+
+        data = resp.json()
+        content_b64 = data.get("content")
+        if not content_b64:
+            return None
+
+        content = base64.b64decode(content_b64).decode("utf-8", errors="replace")
+        return content, data["sha"]
+
+
+def update_file(
+    repo: str,
+    path: str,
+    content: str,
+    sha: str,
+    message: str,
+    token: str,
+    branch: str = "main",
+) -> None:
+    """Commitea un archivo directo a `branch` vía la Contents API (crea un commit real)."""
+    url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
+
+    payload = {
+        "message": message,
+        "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+        "sha": sha,
+        "branch": branch,
+    }
+
+    with httpx.Client() as client:
+        resp = client.put(
+            url,
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        resp.raise_for_status()
+        logger.info(f"Commit aplicado en {repo}@{branch}: {path}")
+
+
+def list_commits_for_path(repo: str, path: str, token: str, per_page: int = 15) -> list[dict]:
+    """Historial de commits que tocaron `path` (más reciente primero)."""
+    url = f"{GITHUB_API}/repos/{repo}/commits"
+
+    with httpx.Client() as client:
+        resp = client.get(
+            url,
+            params={"path": path, "per_page": per_page},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 def post_review(
     repo: str,
     pr_number: int,
