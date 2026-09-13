@@ -88,13 +88,22 @@ def patterns_add(body: NewPattern, x_admin_token: str = Header(None)):
     _check_admin_token(x_admin_token)
     if not body.text.strip():
         raise HTTPException(status_code=400, detail="El patrón no puede estar vacío")
-    return patterns_store.add_pattern(body.text.strip(), body.source.strip())
+    try:
+        return patterns_store.add_pattern(body.text.strip(), body.source.strip())
+    except Exception as e:
+        logger.warning(f"Error commiteando patrón nuevo: {e}")
+        raise HTTPException(status_code=502, detail="No se pudo commitear a GitHub")
 
 
 @app.delete("/patterns/api/{pattern_id}")
 def patterns_remove(pattern_id: str, x_admin_token: str = Header(None)):
     _check_admin_token(x_admin_token)
-    if not patterns_store.remove_pattern(pattern_id):
+    try:
+        removed = patterns_store.remove_pattern(pattern_id)
+    except Exception as e:
+        logger.warning(f"Error commiteando la baja del patrón '{pattern_id}': {e}")
+        raise HTTPException(status_code=502, detail="No se pudo commitear a GitHub")
+    if not removed:
         raise HTTPException(status_code=404, detail="Patrón no encontrado")
     return {"removed": pattern_id}
 

@@ -118,7 +118,7 @@ def get_file_with_sha(repo: str, path: str, ref: str, token: str) -> tuple[str, 
         if not content_b64:
             return None
 
-        content = base64.b64decode(content_b64).decode("utf-8")
+        content = base64.b64decode(content_b64).decode("utf-8", errors="replace")
         return content, data["sha"]
 
 
