@@ -93,6 +93,12 @@ GITHUB_WEBHOOK_SECRET=tu_secret_aqui
 ANTHROPIC_API_KEY=sk-ant-...
 PORT=8000
 
+# Proveedor del análisis semántico: anthropic (default) | openai | xai (Grok)
+# Solo se usa la key del proveedor activo. Un valor inválido hace fallar el arranque.
+LLM_PROVIDER=anthropic
+# XAI_API_KEY=xai-...
+# XAI_MODEL=grok-4.20-0309-non-reasoning
+
 # Opcional — control de costo
 ANTHROPIC_MODEL=claude-haiku-4-5    # más barato; claude-sonnet-4-6 para máxima detección
 MAX_PATCH_CHARS=12000               # tope de caracteres del diff por archivo
