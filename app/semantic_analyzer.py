@@ -17,23 +17,56 @@ from config.settings import (
     OPENAI_MODEL,
     OBSERVATORY_URL,
     OBSERVATORY_TOKEN,
+    XAI_API_KEY,
+    XAI_MODEL,
 )
 
 logger = logging.getLogger(__name__)
 
-MODEL = OPENAI_MODEL if LLM_PROVIDER == "openai" else ANTHROPIC_MODEL
+_PROVIDERS = ("anthropic", "openai", "xai")
+if LLM_PROVIDER not in _PROVIDERS:
+    # Antes un valor mal escrito caía a Anthropic en silencio; mejor fallar fuerte.
+    raise ValueError(f"LLM_PROVIDER inválido: {LLM_PROVIDER!r} (válidos: {', '.join(_PROVIDERS)})")
+
+# xAI (Grok) expone una API compatible con OpenAI: mismo formato de request/response.
+_OPENAI_COMPATIBLE = LLM_PROVIDER in ("openai", "xai")
+_XAI_BASE_URL = "https://api.x.ai/v1"
+
+MODEL = {"openai": OPENAI_MODEL, "xai": XAI_MODEL}.get(LLM_PROVIDER, ANTHROPIC_MODEL)
 
 
 def _build_client():
-    """Crea el cliente de Claude u OpenAI según LLM_PROVIDER.
+    """Crea el cliente de Claude, OpenAI o Grok (xAI) según LLM_PROVIDER.
 
     Con OBSERVATORY_TOKEN, envuelve el cliente con llm-observatory para enviar
-    métricas de uso/costo (soporta ambos proveedores). Si el SDK no está
+    métricas de uso/costo (soporta los tres proveedores). Si el SDK no está
     instalado o falla al inicializar (p. ej. Python < 3.10, URL/token
     inválidos), cae al cliente plano correspondiente: la observabilidad nunca
     debe impedir que el bot revise PRs.
     """
     token = OBSERVATORY_TOKEN.strip() if OBSERVATORY_TOKEN else ""
+
+    if LLM_PROVIDER == "xai":
+        if not token:
+            logger.info("LLM Observatory desactivado (sin OBSERVATORY_TOKEN); no se envían métricas")
+            return openai.OpenAI(api_key=XAI_API_KEY, base_url=_XAI_BASE_URL)
+        try:
+            from llm_observatory import MonitoredGrok
+
+            client = MonitoredGrok(
+                api_key=XAI_API_KEY,
+                observatory_url=OBSERVATORY_URL,
+                observatory_token=token,
+                tags={"app": "codereviewx", "env": "production"},
+            )
+            logger.info(f"LLM Observatory activado (Grok); métricas hacia {OBSERVATORY_URL}")
+            return client
+        except Exception as e:
+            logger.error(
+                f"No se pudo inicializar LLM Observatory ({type(e).__name__}: {e}); "
+                "se usa el cliente de Grok sin métricas"
+            )
+            return openai.OpenAI(api_key=XAI_API_KEY, base_url=_XAI_BASE_URL)
 
     if LLM_PROVIDER == "openai":
         if not token:
@@ -222,7 +255,7 @@ def analyze_semantically(
     )
 
     try:
-        if LLM_PROVIDER == "openai":
+        if _OPENAI_COMPATIBLE:
             response = client.chat.completions.create(
                 model=MODEL,
                 max_tokens=1024,

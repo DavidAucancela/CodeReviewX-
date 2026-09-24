@@ -45,7 +45,7 @@ run_review_pipeline (background task)
 |---|---|
 | Web framework | FastAPI + Uvicorn |
 | GitHub integration | PyGithub + custom JWT auth |
-| AI analysis | Anthropic Claude (configurable, defaults to `claude-haiku-4-5`) |
+| AI analysis | Switchable via `LLM_PROVIDER`: Anthropic Claude (default, `claude-haiku-4-5`), OpenAI, or xAI Grok (`grok-4.20-0309-non-reasoning`) |
 | Static analysis (Python) | Ruff |
 | Static analysis (JS/TS) | ESLint |
 | Observability | llm-observatory (opt-in token/cost metrics) |
@@ -75,6 +75,12 @@ GITHUB_APP_ID=your_app_id
 GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
 ANTHROPIC_API_KEY=your_anthropic_key
+
+# LLM provider: anthropic (default) | openai | xai (Grok). Only the matching key is used.
+LLM_PROVIDER=anthropic
+# OPENAI_API_KEY=your_openai_key
+# XAI_API_KEY=your_xai_key
+# XAI_MODEL=grok-4.20-0309-non-reasoning   # must match an llm-observatory pricing id, else cost = $0
 
 # Optional cost knobs
 ANTHROPIC_MODEL=claude-haiku-4-5   # cheaper default; use claude-sonnet-4-6 for max bug-finding

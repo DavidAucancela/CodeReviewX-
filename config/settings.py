@@ -7,10 +7,12 @@ GITHUB_APP_ID = os.getenv("GITHUB_APP_ID")
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+XAI_API_KEY = os.getenv("XAI_API_KEY")
 PORT = int(os.getenv("PORT", 8000))
 
-# Qué proveedor usa el análisis semántico. "anthropic" (default) o "openai" —
-# útil para seguir revisando PRs si se agota el crédito de una de las dos cuentas.
+# Qué proveedor usa el análisis semántico: "anthropic" (default), "openai" o
+# "xai" (Grok) — útil para seguir revisando PRs si se agota el crédito de una
+# de las cuentas. Un valor desconocido se rechaza al arrancar (ver semantic_analyzer).
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
 
 # Modelo de Claude para el análisis semántico. Haiku 4.5 es ~3x más barato que
@@ -23,6 +25,11 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL") or "claude-haiku-4-5"
 # Modelo de OpenAI para el análisis semántico (solo si LLM_PROVIDER=openai).
 # gpt-4o-mini es el equivalente en costo/calidad a Haiku 4.5.
 OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+
+# Modelo de Grok para el análisis semántico (solo si LLM_PROVIDER=xai). Debe ser
+# un id exacto de la tabla de precios de llm-observatory (si no, el costo se
+# registra en $0). El non-reasoning es el más barato y rápido para JSON.
+XAI_MODEL = os.getenv("XAI_MODEL") or "grok-4.20-0309-non-reasoning"
 
 # Tope de caracteres del diff que se envía a Claude por archivo. Evita que un
 # archivo enorme dispare el costo (~4 chars/token → 12000 chars ≈ 3000 tokens).
