@@ -206,12 +206,20 @@ function sevPills(counts) {
     .join("");
 }
 
+async function authedFetch(url) {
+  const res = await fetch(url, { headers: { "X-Admin-Token": getToken() } });
+  if (res.status === 401) localStorage.removeItem("crx_admin_token");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || ("HTTP " + res.status));
+  }
+  return res.json();
+}
+
 async function loadRepos() {
   const sel = document.getElementById("repo-select");
   try {
-    const res = await fetch(REPOS_API);
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
+    const data = await authedFetch(REPOS_API);
     if (!data.repos.length) {
       sel.innerHTML = '<option>Sin repos accesibles</option>';
       return;
@@ -232,9 +240,7 @@ async function loadReviews() {
 
   list.innerHTML = '<div class="empty">Buscando reviews del bot en los PRs recientes…</div>';
   try {
-    const res = await fetch(`${REVIEWS_API}?repo=${encodeURIComponent(repo)}&limit=${limit}`);
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
+    const data = await authedFetch(`${REVIEWS_API}?repo=${encodeURIComponent(repo)}&limit=${limit}`);
     renderReviews(data.reviews);
   } catch (err) {
     list.innerHTML = '<div class="empty">Error consultando GitHub.</div>';

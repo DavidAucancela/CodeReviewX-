@@ -116,7 +116,8 @@ def dashboard_page():
 
 
 @app.get("/dashboard/api/repos")
-def dashboard_repos():
+def dashboard_repos(x_admin_token: str = Header(None)):
+    _check_admin_token(x_admin_token)
     try:
         return {"repos": dashboard_store.list_repos()}
     except httpx.HTTPError:
@@ -131,7 +132,8 @@ _REPO_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
 
 
 @app.get("/dashboard/api/reviews")
-def dashboard_reviews(repo: str, limit: int = 15):
+def dashboard_reviews(repo: str, limit: int = 15, x_admin_token: str = Header(None)):
+    _check_admin_token(x_admin_token)
     if not _REPO_RE.match(repo):
         raise HTTPException(status_code=400, detail="repo debe tener el formato owner/nombre")
     if limit < 1 or limit > 50:
