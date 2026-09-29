@@ -124,6 +124,16 @@ awk 'NF {printf "%s\\n", $0}' private-key.pem
 
 Go to your GitHub App → **Install App** → select the repositories where you want automated reviews.
 
+### Verifying a deploy
+
+`GET /health` returns the active provider and model, e.g. `{"status":"ok","provider":"xai","model":"grok-4.3"}`. To confirm the semantic pass really works, open a test PR with a `.py`/`.ts` file and check the Railway logs for `POST https://api.x.ai/v1/chat/completions "200 OK"` (or the provider's equivalent) and `Review publicado en …`. If reviews come back as "No se encontraron problemas" on every PR, look for `[ERROR] app.semantic_analyzer` — an LLM failure (no credit, wrong model id) looks the same as a clean PR.
+
+### Known limitations
+
+- Diffs longer than `MAX_PATCH_CHARS` (default 12000) are truncated per file.
+- `.vue` files are not supported (only `.py`, `.js`, `.ts`, `.jsx`, `.tsx`).
+- The `/patterns` panel needs `PATTERNS_ADMIN_TOKEN` set to allow edits.
+
 ## Project structure
 
 ```
