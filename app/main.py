@@ -1,8 +1,10 @@
 import logging
+import re
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
@@ -117,20 +119,31 @@ def dashboard_page():
 def dashboard_repos():
     try:
         return {"repos": dashboard_store.list_repos()}
-    except Exception:
-        logger.exception("No se pudo listar los repos de la instalación")
+    except httpx.HTTPError:
+        logger.exception("Error de GitHub listando los repos de la instalación")
         raise HTTPException(status_code=502, detail="No se pudo consultar GitHub")
+    except Exception:
+        logger.exception("Error interno listando los repos de la instalación")
+        raise HTTPException(status_code=500, detail="Error interno")
+
+
+_REPO_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
 
 
 @app.get("/dashboard/api/reviews")
 def dashboard_reviews(repo: str, limit: int = 15):
+    if not _REPO_RE.match(repo):
+        raise HTTPException(status_code=400, detail="repo debe tener el formato owner/nombre")
     if limit < 1 or limit > 50:
         raise HTTPException(status_code=400, detail="limit debe estar entre 1 y 50")
     try:
         reviews = dashboard_store.list_reviewed_prs(repo, limit=limit)
-    except Exception:
-        logger.exception(f"No se pudieron traer los reviews de {repo}")
+    except httpx.HTTPError:
+        logger.exception(f"Error de GitHub trayendo reviews de {repo}")
         raise HTTPException(status_code=502, detail="No se pudo consultar GitHub")
+    except Exception:
+        logger.exception(f"Error interno trayendo reviews de {repo}")
+        raise HTTPException(status_code=500, detail="Error interno")
     return {"repo": repo, "reviews": reviews}
 
 
