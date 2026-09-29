@@ -18,7 +18,7 @@ logging.basicConfig(
 from app.webhook_handler import verify_signature, parse_pr_event  # noqa: E402
 from app.pipeline import run_review_pipeline  # noqa: E402
 from app.semantic_analyzer import MODEL  # noqa: E402
-from app import patterns_store  # noqa: E402
+from app import patterns_store, dashboard_store  # noqa: E402
 from config.settings import LLM_PROVIDER, PATTERNS_ADMIN_TOKEN, SELF_REPO  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -106,6 +106,32 @@ def patterns_remove(pattern_id: str, x_admin_token: str = Header(None)):
     if not removed:
         raise HTTPException(status_code=404, detail="Patrón no encontrado")
     return {"removed": pattern_id}
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page():
+    return FileResponse(_STATIC_DIR / "dashboard.html")
+
+
+@app.get("/dashboard/api/repos")
+def dashboard_repos():
+    try:
+        return {"repos": dashboard_store.list_repos()}
+    except Exception:
+        logger.exception("No se pudo listar los repos de la instalación")
+        raise HTTPException(status_code=502, detail="No se pudo consultar GitHub")
+
+
+@app.get("/dashboard/api/reviews")
+def dashboard_reviews(repo: str, limit: int = 15):
+    if limit < 1 or limit > 50:
+        raise HTTPException(status_code=400, detail="limit debe estar entre 1 y 50")
+    try:
+        reviews = dashboard_store.list_reviewed_prs(repo, limit=limit)
+    except Exception:
+        logger.exception(f"No se pudieron traer los reviews de {repo}")
+        raise HTTPException(status_code=502, detail="No se pudo consultar GitHub")
+    return {"repo": repo, "reviews": reviews}
 
 
 @app.post("/webhook")

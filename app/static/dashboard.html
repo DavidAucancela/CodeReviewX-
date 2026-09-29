@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — CodeReviewX</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #edf1f4; --surface: #ffffff; --surface-sunken: #e4e9ed;
+    --border: #d4dce1; --border-strong: #b7c2c9;
+    --text: #17222c; --text-muted: #55636e; --text-faint: #8492a0;
+    --accent: #a75a1d; --accent-soft: #f3e4d4; --accent-strong: #7f4315;
+    --sev-high: #c23b3b; --sev-high-soft: #f6e2e2;
+    --sev-med: #b8860f; --sev-med-soft: #f7edd6;
+    --sev-low: #3468b0; --sev-low-soft: #e1eaf6;
+    --ok: #2f7d5c; --danger: #b23b3b; --danger-soft: #f6e2e2;
+    --shadow: 0 1px 2px rgba(23,34,44,.06), 0 8px 24px -12px rgba(23,34,44,.18);
+    --radius: 10px;
+    --font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#10161c; --surface:#182129; --surface-sunken:#0d1218;
+      --border:#2a3743; --border-strong:#3c4c59;
+      --text:#e7ecef; --text-muted:#a3b1bb; --text-faint:#6d7d89;
+      --accent:#e3a15a; --accent-soft:#3a2c1c; --accent-strong:#f0b877;
+      --sev-high:#e2726c; --sev-high-soft:#3a2020;
+      --sev-med:#dcb24f; --sev-med-soft:#372c14;
+      --sev-low:#6ba3e8; --sev-low-soft:#182838;
+      --ok:#5cbd93; --danger:#e2726c; --danger-soft:#3a2020;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#10161c; --surface:#182129; --surface-sunken:#0d1218;
+    --border:#2a3743; --border-strong:#3c4c59;
+    --text:#e7ecef; --text-muted:#a3b1bb; --text-faint:#6d7d89;
+    --accent:#e3a15a; --accent-soft:#3a2c1c; --accent-strong:#f0b877;
+    --sev-high:#e2726c; --sev-high-soft:#3a2020;
+    --sev-med:#dcb24f; --sev-med-soft:#372c14;
+    --sev-low:#6ba3e8; --sev-low-soft:#182838;
+    --ok:#5cbd93; --danger:#e2726c; --danger-soft:#3a2020;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
+    padding: 0 20px 64px;
+  }
+  h1,h2 { text-wrap: balance; margin: 0; }
+  code, .mono { font-family: var(--font-mono); }
+  a { color: inherit; }
+  .shell { max-width: 980px; margin: 0 auto; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; padding: 22px 0 18px;
+    border-bottom: 1px solid var(--border); margin-bottom: 24px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand-mark {
+    font-family: var(--font-mono); font-weight: 600; font-size: 13px;
+    letter-spacing: .06em; color: var(--accent-strong);
+    background: var(--accent-soft); padding: 3px 8px; border-radius: 6px;
+  }
+  .brand h1 { font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+  .brand-sub { color: var(--text-faint); font-size: 13px; }
+  .brand-sub a { text-decoration: none; color: var(--accent-strong); }
+  .brand-sub a:hover { text-decoration: underline; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 22px; }
+  select, .limit-input {
+    font-family: var(--font-ui); font-size: 13.5px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 7px; padding: 8px 10px;
+  }
+  .limit-input { width: 70px; }
+  .hint-inline { font-size: 12.5px; color: var(--text-faint); }
+
+  .empty { padding: 40px 20px; color: var(--text-faint); font-size: 13.5px; text-align: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+
+  .pr-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); margin-bottom: 14px; overflow: hidden;
+  }
+  .pr-head {
+    display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer;
+  }
+  .pr-head:hover { background: var(--surface-sunken); }
+  .pr-num { font-family: var(--font-mono); color: var(--text-faint); font-size: 13px; flex-shrink: 0; }
+  .pr-title { font-size: 14.5px; font-weight: 500; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pr-meta { font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
+  .sev-pills { display: flex; gap: 6px; flex-shrink: 0; }
+  .sev-pill {
+    font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
+    padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .sev-pill.high { background: var(--sev-high-soft); color: var(--sev-high); }
+  .sev-pill.med { background: var(--sev-med-soft); color: var(--sev-med); }
+  .sev-pill.low { background: var(--sev-low-soft); color: var(--sev-low); }
+  .caret { color: var(--text-faint); font-size: 12px; transition: transform .15s; flex-shrink: 0; }
+  .pr-card.open .caret { transform: rotate(90deg); }
+
+  .pr-body { display: none; border-top: 1px solid var(--border); }
+  .pr-card.open .pr-body { display: block; }
+  .summary { padding: 14px 18px; font-size: 13px; color: var(--text-muted); white-space: pre-wrap;
+    border-bottom: 1px dashed var(--border); background: var(--surface-sunken); }
+
+  .comment { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .comment:last-child { border-bottom: none; }
+  .comment-path { font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); margin-bottom: 6px; }
+  .comment-path a { text-decoration: none; }
+  .comment-path a:hover { text-decoration: underline; }
+  .comment-body { font-size: 13.5px; white-space: pre-wrap; margin-bottom: 8px; }
+  .comment-actions { display: flex; justify-content: flex-end; }
+  .icon-btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+    padding: 4px 9px; border-radius: 6px; font-size: 12px; font-family: var(--font-ui);
+    cursor: pointer;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent-strong); }
+  .icon-btn:disabled { opacity: .5; cursor: wait; }
+
+  .banner {
+    display: none; margin-bottom: 20px; padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; border: 1px solid;
+  }
+  .banner.show { display: block; }
+  .banner.err { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+  .banner.ok { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+
+  footer.notice { max-width: 980px; margin: 28px auto 0; font-size: 12.5px; color: var(--text-faint); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">CRX</span>
+      <div>
+        <h1>Dashboard de Reviews</h1>
+        <div class="brand-sub">leído en vivo de GitHub · <a href="/patterns">panel de patrones →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="banner" class="banner"></div>
+
+  <div class="controls">
+    <select id="repo-select"><option>Cargando repos…</option></select>
+    <input class="limit-input" id="limit-input" type="number" min="1" max="50" value="15" title="PRs a revisar">
+    <span class="hint-inline">PRs más recientes a inspeccionar (busca el review del bot entre ellos)</span>
+  </div>
+
+  <div id="pr-list"><div class="empty">Elegí un repo para ver sus reviews.</div></div>
+
+  <footer class="notice">
+    No hay base de datos propia: esto consulta la API de GitHub al vuelo, así que no muestra costo/tokens
+    (eso vive en Observatory) ni archivos que el bot se haya saltado por los cost controls.
+  </footer>
+</div>
+
+<script>
+const REPOS_API = "/dashboard/api/repos";
+const REVIEWS_API = "/dashboard/api/reviews";
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function getToken() {
+  let t = localStorage.getItem("crx_admin_token");
+  if (!t) {
+    t = prompt("Token de administrador (PATTERNS_ADMIN_TOKEN):") || "";
+    if (t) localStorage.setItem("crx_admin_token", t);
+  }
+  return t;
+}
+
+function showBanner(msg, kind) {
+  const el = document.getElementById("banner");
+  el.textContent = msg;
+  el.className = "banner show " + kind;
+  setTimeout(() => el.classList.remove("show"), 5000);
+}
+
+function timeAgo(iso) {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 3600) return Math.max(1, Math.round(diff/60)) + "m";
+  if (diff < 86400) return Math.round(diff/3600) + "h";
+  return Math.round(diff/86400) + "d";
+}
+
+function sevPills(counts) {
+  const map = [["🔴","high"], ["🟡","med"], ["🔵","low"]];
+  return map
+    .filter(([emoji]) => counts[emoji] > 0)
+    .map(([emoji, cls]) => `<span class="sev-pill ${cls}">${emoji} ${counts[emoji]}</span>`)
+    .join("");
+}
+
+async function loadRepos() {
+  const sel = document.getElementById("repo-select");
+  try {
+    const res = await fetch(REPOS_API);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.repos.length) {
+      sel.innerHTML = '<option>Sin repos accesibles</option>';
+      return;
+    }
+    sel.innerHTML = data.repos.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+    loadReviews();
+  } catch (err) {
+    sel.innerHTML = '<option>Error cargando repos</option>';
+    showBanner("No se pudieron cargar los repos: " + err.message, "err");
+  }
+}
+
+async function loadReviews() {
+  const repo = document.getElementById("repo-select").value;
+  const limit = document.getElementById("limit-input").value || 15;
+  const list = document.getElementById("pr-list");
+  if (!repo) return;
+
+  list.innerHTML = '<div class="empty">Buscando reviews del bot en los PRs recientes…</div>';
+  try {
+    const res = await fetch(`${REVIEWS_API}?repo=${encodeURIComponent(repo)}&limit=${limit}`);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    renderReviews(data.reviews);
+  } catch (err) {
+    list.innerHTML = '<div class="empty">Error consultando GitHub.</div>';
+    showBanner("Error: " + err.message, "err");
+  }
+}
+
+function renderReviews(reviews) {
+  const list = document.getElementById("pr-list");
+  if (!reviews.length) {
+    list.innerHTML = '<div class="empty">El bot no dejó reviews en los PRs recientes de este repo.</div>';
+    return;
+  }
+
+  list.innerHTML = reviews.map((pr, i) => `
+    <div class="pr-card" data-idx="${i}">
+      <div class="pr-head" data-toggle="${i}">
+        <span class="caret">▶</span>
+        <span class="pr-num">#${pr.number}</span>
+        <span class="pr-title">${escapeHtml(pr.title)}</span>
+        <span class="sev-pills">${sevPills(pr.severity_counts)}</span>
+        <span class="pr-meta">${escapeHtml(pr.author || "?")} · ${timeAgo(pr.updated_at)}</span>
+      </div>
+      <div class="pr-body">
+        <div class="summary">${escapeHtml(pr.review_body || "(sin resumen)")}</div>
+        ${pr.comments.map(c => `
+          <div class="comment">
+            <div class="comment-path">
+              <a href="${c.url}" target="_blank" rel="noopener">${escapeHtml(c.path)}:${c.line ?? "?"}</a>
+            </div>
+            <div class="comment-body">${escapeHtml(c.body)}</div>
+            <div class="comment-actions">
+              <button class="icon-btn" data-fp="${escapeHtml(JSON.stringify({path: c.path, body: c.body, pr: pr.number}))}">
+                Marcar como falso positivo
+              </button>
+            </div>
+          </div>
+        `).join("") || '<div class="comment hint-inline" style="padding:14px 18px;">Sin comentarios inline (todo quedó solo en el resumen).</div>'}
+      </div>
+    </div>
+  `).join("");
+}
+
+document.getElementById("repo-select").addEventListener("change", loadReviews);
+document.getElementById("limit-input").addEventListener("change", loadReviews);
+
+document.getElementById("pr-list").addEventListener("click", async (e) => {
+  const toggleIdx = e.target.closest("[data-toggle]");
+  if (toggleIdx && !e.target.closest(".icon-btn")) {
+    toggleIdx.closest(".pr-card").classList.toggle("open");
+    return;
+  }
+
+  const btn = e.target.closest("[data-fp]");
+  if (!btn) return;
+
+  const { path, body, pr } = JSON.parse(btn.getAttribute("data-fp"));
+  const text = prompt(
+    "Describí el patrón general (no la línea puntual) para que el bot deje de marcar esto:",
+    `En archivos como ${path}, no marcar: ${body.split("\n")[0].slice(0, 140)}`
+  );
+  if (!text || !text.trim()) return;
+
+  btn.disabled = true;
+  try {
+    const res = await fetch("/patterns/api", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": getToken() },
+      body: JSON.stringify({ text: text.trim(), source: `dashboard: ${document.getElementById("repo-select").value}#${pr}` }),
+    });
+    if (!res.ok) {
+      if (res.status === 401) localStorage.removeItem("crx_admin_token");
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.detail || ("HTTP " + res.status));
+    }
+    showBanner("Patrón agregado — el bot dejará de marcar esto en próximos PRs.", "ok");
+  } catch (err) {
+    showBanner("Error al agregar patrón: " + err.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+loadRepos();
+</script>
+</body>
+</html>
