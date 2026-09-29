@@ -41,6 +41,99 @@ def get_installation_token(installation_id: int) -> str:
         return resp.json()["token"]
 
 
+def get_app_slug() -> str:
+    """
+    Retorna el slug de la GitHub App (p.ej. "codereviewpersonalapp"), usado
+    para armar el login con el que postea sus reviews: "<slug>[bot]".
+    """
+    app_jwt = _generate_jwt()
+    with httpx.Client() as client:
+        resp = client.get(
+            f"{GITHUB_API}/app",
+            headers={
+                "Authorization": f"Bearer {app_jwt}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["slug"]
+
+
+def list_installation_repos(token: str) -> list[dict]:
+    """Repos accesibles a la instalación actual (la App está en todos los de la cuenta)."""
+    url = f"{GITHUB_API}/installation/repositories"
+
+    with httpx.Client() as client:
+        resp = client.get(
+            url,
+            params={"per_page": 100},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json().get("repositories", [])
+
+
+def list_pull_requests(
+    repo: str, token: str, state: str = "all", per_page: int = 20
+) -> list[dict]:
+    """PRs más recientes (por última actualización) de un repo, para el dashboard."""
+    url = f"{GITHUB_API}/repos/{repo}/pulls"
+
+    with httpx.Client() as client:
+        resp = client.get(
+            url,
+            params={
+                "state": state,
+                "sort": "updated",
+                "direction": "desc",
+                "per_page": per_page,
+            },
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+def list_pr_reviews(repo: str, pr_number: int, token: str) -> list[dict]:
+    """Reviews (no comentarios inline) publicados en el PR, de cualquier autor."""
+    url = f"{GITHUB_API}/repos/{repo}/pulls/{pr_number}/reviews"
+
+    with httpx.Client() as client:
+        resp = client.get(
+            url,
+            params={"per_page": 100},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+def list_pr_review_comments(repo: str, pr_number: int, token: str) -> list[dict]:
+    """Comentarios inline (sobre líneas del diff) del PR, de cualquier autor."""
+    url = f"{GITHUB_API}/repos/{repo}/pulls/{pr_number}/comments"
+
+    with httpx.Client() as client:
+        resp = client.get(
+            url,
+            params={"per_page": 100},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 def get_pr_files(repo: str, pr_number: int, token: str) -> list[dict]:
     """Retorna la lista de archivos modificados en el PR."""
     url = f"{GITHUB_API}/repos/{repo}/pulls/{pr_number}/files"

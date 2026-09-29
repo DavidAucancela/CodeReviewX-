@@ -1,8 +1,10 @@
 import logging
+import re
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
@@ -18,7 +20,7 @@ logging.basicConfig(
 from app.webhook_handler import verify_signature, parse_pr_event  # noqa: E402
 from app.pipeline import run_review_pipeline  # noqa: E402
 from app.semantic_analyzer import MODEL  # noqa: E402
-from app import patterns_store  # noqa: E402
+from app import patterns_store, dashboard_store  # noqa: E402
 from config.settings import LLM_PROVIDER, PATTERNS_ADMIN_TOKEN, SELF_REPO  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -106,6 +108,45 @@ def patterns_remove(pattern_id: str, x_admin_token: str = Header(None)):
     if not removed:
         raise HTTPException(status_code=404, detail="Patrón no encontrado")
     return {"removed": pattern_id}
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page():
+    return FileResponse(_STATIC_DIR / "dashboard.html")
+
+
+@app.get("/dashboard/api/repos")
+def dashboard_repos(x_admin_token: str = Header(None)):
+    _check_admin_token(x_admin_token)
+    try:
+        return {"repos": dashboard_store.list_repos()}
+    except httpx.HTTPError:
+        logger.exception("Error de GitHub listando los repos de la instalación")
+        raise HTTPException(status_code=502, detail="No se pudo consultar GitHub")
+    except Exception:
+        logger.exception("Error interno listando los repos de la instalación")
+        raise HTTPException(status_code=500, detail="Error interno")
+
+
+_REPO_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
+
+
+@app.get("/dashboard/api/reviews")
+def dashboard_reviews(repo: str, limit: int = 15, x_admin_token: str = Header(None)):
+    _check_admin_token(x_admin_token)
+    if not _REPO_RE.match(repo):
+        raise HTTPException(status_code=400, detail="repo debe tener el formato owner/nombre")
+    if limit < 1 or limit > 50:
+        raise HTTPException(status_code=400, detail="limit debe estar entre 1 y 50")
+    try:
+        reviews = dashboard_store.list_reviewed_prs(repo, limit=limit)
+    except httpx.HTTPError:
+        logger.exception(f"Error de GitHub trayendo reviews de {repo}")
+        raise HTTPException(status_code=502, detail="No se pudo consultar GitHub")
+    except Exception:
+        logger.exception(f"Error interno trayendo reviews de {repo}")
+        raise HTTPException(status_code=500, detail="Error interno")
+    return {"repo": repo, "reviews": reviews}
 
 
 @app.post("/webhook")
