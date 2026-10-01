@@ -40,5 +40,11 @@
     "text": "No describir un endpoint que devuelve 503/401 por falta de credenciales de administrador como que 'el sistema no puede operar' — precisar el alcance real: solo ese endpoint queda deshabilitado, el resto de la aplicación sigue funcionando con normalidad.",
     "source": "app/main.py (PR #12): _check_admin_token",
     "added_at": "2026-09-13"
+  },
+  {
+    "id": "no-asumir-con-probablemente-seguramente-",
+    "text": "No asumir con \"probablemente\"/\"seguramente\" que un archivo relacionado pero no incluido en el diff actual falla o quedó desactualizado (ej.: \"el frontend probablemente sigue llamando sin header\"). Si ese archivo no está en el patch de este PR, no comentar sobre su contenido — solo señalar lo que de verdad cambia en el diff presente.",
+    "source": "PR #16 — falso positivo sobre patterns.html, que ya mandaba el header en el mismo PR",
+    "added_at": "2026-10-01"
   }
 ]
