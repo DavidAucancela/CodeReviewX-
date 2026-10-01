@@ -66,7 +66,8 @@ def patterns_page():
 
 
 @app.get("/patterns/api")
-def patterns_list():
+def patterns_list(x_admin_token: str = Header(None)):
+    _check_admin_token(x_admin_token)
     try:
         history = patterns_store.fetch_history()
     except Exception as e:
