@@ -46,5 +46,11 @@
     "text": "No asumir con \"probablemente\"/\"seguramente\" que un archivo relacionado pero no incluido en el diff actual falla o quedó desactualizado (ej.: \"el frontend probablemente sigue llamando sin header\"). Si ese archivo no está en el patch de este PR, no comentar sobre su contenido — solo señalar lo que de verdad cambia en el diff presente.",
     "source": "PR #16 — falso positivo sobre patterns.html, que ya mandaba el header en el mismo PR",
     "added_at": "2026-10-01"
+  },
+  {
+    "id": "hallazgo-l-nea-46-getboundingclientrect-",
+    "text": "Hallazgo: Línea 46 (🟡, getBoundingClientRect)\nVeredicto: Falso positivo.\nQué hice: Es una sola lectura por movimiento del ratón, sin escrituras de layout en\nmedio, y el tilt se anima con transforms. No hay layout thrashing real. Lo dejé así,\naunque puedes marcarlo como falso positivo en el PR.",
+    "source": "dashboard: DavidAucancela/XV-Tammy#26",
+    "added_at": "2026-10-02"
   }
 ]
