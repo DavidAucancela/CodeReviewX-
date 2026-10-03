@@ -160,7 +160,7 @@
       <span class="brand-mark">CRX</span>
       <div>
         <h1>Panel de Patrones</h1>
-        <div class="brand-sub"><span id="repo-label">CodeReviewX</span> · <a href="/dashboard" style="color:var(--accent-strong);text-decoration:none;">dashboard de reviews →</a></div>
+        <div class="brand-sub" id="repo-label">CodeReviewX</div>
       </div>
     </div>
     <div class="status-row" id="status-row">
@@ -249,9 +249,11 @@ function timeAgo(iso) {
 }
 
 async function load() {
-  const res = await fetch(API);
+  const res = await fetch(API, { headers: { "X-Admin-Token": getToken() } });
   if (!res.ok) {
-    showBanner("No se pudo cargar el panel (HTTP " + res.status + ")", "err");
+    if (res.status === 401) localStorage.removeItem("crx_admin_token");
+    const body = await res.json().catch(() => ({}));
+    showBanner(body.detail || ("No se pudo cargar el panel (HTTP " + res.status + ")"), "err");
     return;
   }
   const data = await res.json();

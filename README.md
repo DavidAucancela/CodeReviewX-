@@ -13,7 +13,9 @@ Automated code review bot deployed as a GitHub App. Listens to pull request webh
 - **Multi-language support** — `.py`, `.js`, `.ts`, `.jsx`, `.tsx`
 - **HMAC signature verification** — validates every webhook payload with `sha256=` signature
 - **Non-blocking pipeline** — webhook responds immediately; analysis runs in background via `asyncio`
-- **Health endpoint** — `GET /health` returns `{"status": "ok"}` for uptime monitoring
+- **Health endpoint** — `GET /health` returns `{"status": "ok", "provider": ..., "model": ...}` for uptime monitoring and quick config checks
+- **False-positives panel** (`/patterns`) — view, add and remove known false-positive patterns that get injected into the semantic prompt, with GitHub commit history. Protected by `PATTERNS_ADMIN_TOKEN`.
+- **Review dashboard** (`/dashboard`) — browse what the bot already posted on recent PRs (summary + inline comments with severity) without opening GitHub, with a one-click "mark as false positive" that feeds straight into `/patterns`. Reads live from the GitHub API, nothing stored locally. Also protected by `PATTERNS_ADMIN_TOKEN`.
 
 ## Architecture
 
@@ -59,12 +61,14 @@ run_review_pipeline (background task)
 Go to **GitHub → Settings → Developer settings → GitHub Apps → New GitHub App**
 
 Required permissions:
-- **Contents**: Read-only
+- **Contents**: Read and write (read-only is *not* enough — the `/patterns` panel commits directly to `main` via the Contents API; with read-only it fails with `403 Resource not accessible by integration` even though `PATTERNS_ADMIN_TOKEN` is correct)
 - **Metadata**: Read-only
 - **Pull requests**: Read and write
 
 Subscribe to events:
 - **Pull request**
+
+> If you're changing permissions on an App that's **already installed**, updating the permission on the App itself isn't enough — go to `github.com/settings/installations`, find the App, and accept the updated permissions there too. Until you do, the installation keeps running with the old (narrower) grant.
 
 Set the Webhook URL to your server URL + `/webhook`.
 
@@ -132,20 +136,30 @@ Go to your GitHub App → **Install App** → select the repositories where you 
 
 - Diffs longer than `MAX_PATCH_CHARS` (default 12000) are truncated per file.
 - `.vue` files are not supported (only `.py`, `.js`, `.ts`, `.jsx`, `.tsx`).
-- The `/patterns` panel needs `PATTERNS_ADMIN_TOKEN` set to allow edits.
+- Both `/patterns` and `/dashboard` need `PATTERNS_ADMIN_TOKEN` set to work at all (their `*/api/*` endpoints return `503` without it, `401` with the wrong one); the HTML pages themselves load without a token.
+- `/dashboard` reads everything live from the GitHub API — no cost/token data (that's only in `llm-observatory`) and no visibility into files a review skipped via `RISKY_FILES_ONLY`/`TWO_PASS_MODE` (those only show up in the Railway logs).
+- No automated test suite yet.
 
 ## Project structure
 
 ```
 ├── app/
-│   ├── main.py              # FastAPI app, webhook endpoint
+│   ├── main.py              # FastAPI app: /webhook, /health, /patterns, /dashboard
 │   ├── webhook_handler.py   # Signature verification, event parsing
 │   ├── pipeline.py          # Review orchestration
 │   ├── diff_parser.py       # PR diff parsing, line mapping
 │   ├── static_analyzer.py   # Ruff + ESLint runners
-│   └── semantic_analyzer.py # Claude AI analysis
+│   ├── semantic_analyzer.py # LLM analysis (Anthropic/OpenAI/xAI)
+│   ├── github_client.py     # Hand-rolled GitHub API client (httpx + PyJWT)
+│   ├── patterns_store.py    # Known-false-positives list: read/write/history
+│   ├── dashboard_store.py   # Live GitHub queries for the /dashboard panel
+│   ├── repo_context.py      # Optional full-repo clone for richer context
+│   └── static/
+│       ├── patterns.html    # /patterns panel UI
+│       └── dashboard.html   # /dashboard panel UI
 ├── config/
-│   └── settings.py          # Environment config, private key loader
+│   ├── settings.py           # Environment config, private key loader
+│   └── false_positives.json  # Data behind the /patterns panel
 ├── Dockerfile
 ├── docker-compose.yml       # Local Docker dev
 └── requirements.txt
